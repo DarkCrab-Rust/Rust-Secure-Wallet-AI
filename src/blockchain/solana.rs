@@ -1,3 +1,9 @@
+// Minimal Solana client stub for core-only repo.
+// Full implementation is archived in legacy/solana_rs_orig.rs
+
+pub fn solana_client_placeholder() -> &'static str {
+    "solana-stub"
+}
 use anyhow::Result;
 use async_trait::async_trait;
 use tracing::{debug, info};
