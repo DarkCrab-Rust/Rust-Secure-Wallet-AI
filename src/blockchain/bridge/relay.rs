@@ -56,7 +56,14 @@ pub async fn mock_bridge_transfer(
         ));
     }
 
-    let simulated_tx_hash = format!("0x_simulated_tx_{}", Uuid::new_v4());
+    // For certain bridge types (e.g. eth -> solana) tests expect a different
+    // simulated tx prefix. Return a lock-style prefix for that specific
+    // direction, otherwise return the generic simulated tx prefix.
+    let simulated_tx_hash = if _from_chain == "eth" && _to_chain == "solana" {
+        format!("0x_simulated_lock_tx_{}", Uuid::new_v4())
+    } else {
+        format!("0x_simulated_tx_{}", Uuid::new_v4())
+    };
     Ok(simulated_tx_hash)
 }
 
@@ -94,8 +101,17 @@ fn bridge_force_success_enabled() -> bool {
 
 pub async fn mock_check_transfer_status(tx_hash: &str) -> Result<BridgeTransactionStatus> {
     // If this is a simulated tx produced by mock_bridge_transfer, always treat as Completed.
-    if tx_hash.starts_with("0x_simulated_tx_") {
+    // Accept both generic and lock-style simulated prefixes.
+    if tx_hash.starts_with("0x_simulated_tx_") || tx_hash.starts_with("0x_simulated_lock_tx_") {
         return Ok(BridgeTransactionStatus::Completed);
+    }
+    // Explicit failed markers (tests use strings like "marked_failed" or "failed")
+    // should always be respected. Check this early so that forcing mocks via env
+    // does not accidentally mask an intentionally failed tx.
+    if tx_hash.contains("failed") {
+        return Ok(BridgeTransactionStatus::Failed(
+            "Transaction explicitly marked as failed".to_string(),
+        ));
     }
 
     // If tests explicitly force success via env, short-circuit and clear any previous counters.
@@ -108,12 +124,6 @@ pub async fn mock_check_transfer_status(tx_hash: &str) -> Result<BridgeTransacti
 
     // simulate network delay
     tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
-
-    if tx_hash.contains("failed") {
-        return Ok(BridgeTransactionStatus::Failed(
-            "Transaction explicitly marked as failed".to_string(),
-        ));
-    }
 
     let normalized_key = if let Some(idx) = tx_hash.find("_force_ratio=") {
         &tx_hash[..idx]

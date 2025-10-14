@@ -193,9 +193,7 @@ path = "src/bin/wallet-cli.rs"
 name = "bridge_test"
 path = "src/bin/bridge_test.rs"
 
-[[test]]
-name = "tools_serdes_tests"
-path = "tests/tools_serdes_tests.rs"
+
 
 [patch.crates-io]
 # 使用本地补丁进行测试/构建

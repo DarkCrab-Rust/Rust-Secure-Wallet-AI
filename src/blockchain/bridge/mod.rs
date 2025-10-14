@@ -5,7 +5,6 @@ pub mod mock;
 pub mod relay;
 pub mod transfer;
 
-use crate::blockchain::traits::Bridge;
 use crate::core::wallet_info::SecureWalletData;
 use serde::{Deserialize, Serialize};
 
@@ -35,6 +34,17 @@ pub struct BridgeTransaction {
     pub fee_amount: Option<String>,
     pub estimated_completion_time: Option<chrono::DateTime<chrono::Utc>>,
 }
+
+// Re-export commonly-used mock bridge implementations at the module root so
+// tests and other code that previously imported them from
+// `blockchain::bridge::EthereumToSolanaBridge` continue to compile.
+pub use mock::{
+    EthereumToBSCBridge, EthereumToSolanaBridge, PolygonToEthereumBridge, SolanaToEthereumBridge,
+};
+
+// Re-export the Bridge trait here for compatibility with existing imports
+// that expect `bridge::Bridge` to be available.
+pub use crate::blockchain::traits::Bridge;
 
 /// Thin facade to initiate bridge transfer.
 pub async fn bridge_transfer(
