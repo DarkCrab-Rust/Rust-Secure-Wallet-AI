@@ -60,8 +60,7 @@ pub async fn mock_bridge_transfer(
     Ok(simulated_tx_hash)
 }
 
-/// 检查是否应该强制 mock 桥接为成功（Accept several env names/values）。
-/// Default: disabled. Enabled only if one of the keys is present and not explicitly false-like.
+/// 检查是否应该强制 mock 桥接为成功（接受多个 env 名称）
 fn bridge_force_success_enabled() -> bool {
     const KEYS: &[&str] =
         &["BRIDGE_MOCK_FORCE_SUCCESS", "BRIDGE_MOCK", "FORCE_BRIDGE_SUCCESS", "BRIDGE_MOCK_FORCE"];
@@ -69,14 +68,12 @@ fn bridge_force_success_enabled() -> bool {
     for &k in KEYS {
         if let Ok(val) = env::var(k) {
             let v = val.trim();
-            // explicit disabled values -> continue checking other keys
             if v.eq_ignore_ascii_case("0")
                 || v.eq_ignore_ascii_case("false")
                 || v.eq_ignore_ascii_case("no")
             {
                 continue;
             }
-            // empty, "1", "true", "yes", "on", or any other non-false string -> enabled
             if v.is_empty()
                 || v == "1"
                 || v.eq_ignore_ascii_case("true")
@@ -93,21 +90,16 @@ fn bridge_force_success_enabled() -> bool {
 }
 
 pub async fn mock_check_transfer_status(tx_hash: &str) -> Result<BridgeTransactionStatus> {
-    // If this is a simulated tx produced by mock_bridge_transfer, always treat as Completed.
     if tx_hash.starts_with("0x_simulated_tx_") || tx_hash.starts_with("0x_simulated_lock_tx_") {
         return Ok(BridgeTransactionStatus::Completed);
     }
 
-    // If the tx contains an explicit failed marker, return Failed even when mocks
-    // are enabled. This allows tests to mark a transaction as failed and assert
-    // the behavior deterministically.
     if tx_hash.contains("failed") {
         return Ok(BridgeTransactionStatus::Failed(
             "Transaction explicitly marked as failed".to_string(),
         ));
     }
 
-    // If tests explicitly force success via env, short-circuit and clear any previous counters.
     if env::var("RUST_TEST_THREADS").is_ok() || bridge_force_success_enabled() {
         if let Ok(mut checks) = TRANSACTION_CHECKS.lock() {
             checks.clear();
@@ -115,7 +107,6 @@ pub async fn mock_check_transfer_status(tx_hash: &str) -> Result<BridgeTransacti
         return Ok(BridgeTransactionStatus::Completed);
     }
 
-    // simulate network delay
     tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
 
     if tx_hash.contains("failed") {

@@ -108,7 +108,9 @@ pub fn init_default_languages() -> Result<I18nManager> {
         use std::fs;
         // Try to read English from disk
         match fs::read_to_string("resources/i18n/en.ftl") {
-            Ok(s) => { manager.load_language("en", &s)?; }
+            Ok(s) => {
+                manager.load_language("en", &s)?;
+            }
             Err(_) => {
                 // Minimal default
                 let s = "hello = Hello\n";
@@ -119,7 +121,9 @@ pub fn init_default_languages() -> Result<I18nManager> {
 
         // Try to read Chinese from disk
         match fs::read_to_string("resources/i18n/zh.ftl") {
-            Ok(s) => { manager.load_language("zh", &s)?; }
+            Ok(s) => {
+                manager.load_language("zh", &s)?;
+            }
             Err(_) => {
                 let s = "hello = 你好\n";
                 manager.load_language("zh", s)?;

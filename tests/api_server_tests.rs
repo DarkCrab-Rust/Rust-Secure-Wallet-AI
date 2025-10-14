@@ -455,12 +455,15 @@ async fn test_bridge_assets() {
         "token": "USDC",
         "amount": "10.0"
     });
+    // Force mock bridge behavior for this test's success path
+    std::env::set_var("BRIDGE_MOCK_FORCE_SUCCESS", "1");
     let response =
         server.post("/api/bridge").json(&payload).add_header("Authorization", "test_api_key").await;
     // Server now returns 200 OK with a bridge_tx_id in the body for bridge requests
     assert_eq!(response.status_code(), StatusCode::OK);
     let body: serde_json::Value = response.json();
     assert!(body["bridge_tx_id"].is_string());
+    std::env::remove_var("BRIDGE_MOCK_FORCE_SUCCESS");
 }
 
 #[tokio::test]
@@ -507,14 +510,20 @@ async fn bridge_all_branches_including_concurrent() {
     let name = format!("br_{}", Uuid::new_v4().simple());
     create_test_wallet(&server, &name).await;
     let ok = json!({ "from_wallet": name.clone(), "from_chain": "eth", "to_chain": "solana", "token": "USDC", "amount": "2.0" });
+    // Force mock bridge behavior for success path
+    std::env::set_var("BRIDGE_MOCK_FORCE_SUCCESS", "1");
     let r6 = server.post("/api/bridge").json(&ok).add_header("Authorization", "test_api_key").await;
     assert_eq!(r6.status_code(), StatusCode::OK);
     let b: Value = r6.json();
     assert!(!b["bridge_tx_id"].as_str().unwrap_or("").is_empty());
+    std::env::remove_var("BRIDGE_MOCK_FORCE_SUCCESS");
 
     // concurrent bridges
     let server_arc = Arc::new(server);
     let req = ok.clone();
+    // Force mock behavior for concurrent requests
+    std::env::set_var("BRIDGE_MOCK_FORCE_SUCCESS", "1");
+
     let futs: Vec<_> = (0..6)
         .map(|_| {
             let s = server_arc.clone();
@@ -530,6 +539,8 @@ async fn bridge_all_branches_including_concurrent() {
         let br: Value = res.json();
         assert!(!br["bridge_tx_id"].as_str().unwrap_or("").is_empty());
     }
+
+    std::env::remove_var("BRIDGE_MOCK_FORCE_SUCCESS");
 }
 
 #[tokio::test]

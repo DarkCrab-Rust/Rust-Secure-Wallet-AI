@@ -56,6 +56,7 @@ k256 = { version = "0.13", features = ["arithmetic", "serde"] }
 p256 = { version = "0.13", features = ["arithmetic", "serde"] }
 p384 = { version = "0.9", features = ["serde"] }
 
+# Optional local patch crate used by sop_patch_tests feature (kept as dev-dependency below)
 curve25519-dalek = "4.0"
 curve25519-dalek-ml = { version = "4.2", features = ["group", "group-bits"] }
 ed448-goldilocks-plus = "0.16"
@@ -136,7 +137,6 @@ msgpack = []
 test-env = []
 sop_patch_tests = []
 bls-tests = ["dep:blsful"]
-shamir-impl = []
 pkcs11-backend = ["pkcs11"]
 # When enabled, include bundled resource files (i18n) into the binary via `include_str!`.
 # Default: disabled so the core repo doesn't need to carry large documentation/assets.
@@ -193,9 +193,7 @@ path = "src/bin/wallet-cli.rs"
 name = "bridge_test"
 path = "src/bin/bridge_test.rs"
 
-[[test]]
-name = "tools_serdes_tests"
-path = "tests/tools_serdes_tests.rs"
+
 
 [patch.crates-io]
 # 使用本地补丁进行测试/构建

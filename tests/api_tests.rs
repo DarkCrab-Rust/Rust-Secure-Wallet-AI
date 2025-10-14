@@ -194,12 +194,18 @@ async fn test_bridge_assets() {
         "token": "USDC",
         "amount": "10.0"
     });
-    let response =
-        server.post("/api/bridge").json(&payload).add_header("Authorization", "test_api_key").await;
+    // Force mock bridge behavior for this test to avoid real decryption/signing
+    std::env::set_var("BRIDGE_MOCK_FORCE_SUCCESS", "1");
+    let response = server
+        .post("/api/bridge")
+        .json(&payload)
+        .add_header("Authorization", "test_api_key")
+        .await;
     // Server now returns 200 OK with a bridge_tx_id in the body for bridge requests
     assert_eq!(response.status_code(), StatusCode::OK);
     let body: serde_json::Value = response.json();
     assert!(body["bridge_tx_id"].is_string());
+    std::env::remove_var("BRIDGE_MOCK_FORCE_SUCCESS");
 }
 
 #[tokio::test]

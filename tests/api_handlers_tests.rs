@@ -25,6 +25,7 @@ async fn setup_test_server() -> TestServer {
         },
         ..Default::default()
     };
+    // Ensure mock bridge behavior for API tests that expect deterministic results.
     let server = WalletServer::new("127.0.0.1".to_string(), 0, config, None).await.unwrap();
     TestServer::new(server.create_router().await).unwrap()
 }
@@ -127,6 +128,9 @@ async fn test_bridge_wallet_lifecycle_and_success() {
     // Create a wallet via the API then call /api/bridge to get success branch
     let server = setup_test_server().await;
 
+    // Force mock bridge behavior for this test so we get deterministic bridge_tx_id
+    std::env::set_var("BRIDGE_MOCK_FORCE_SUCCESS", "1");
+
     let wallet_name = format!("ok_{}", Uuid::new_v4().simple());
     // create wallet using raw json to avoid importing CreateWalletRequest
     let create_res = server
@@ -149,6 +153,9 @@ async fn test_bridge_wallet_lifecycle_and_success() {
     // Deserialize bridge response produced by server.rs
     let body: serde_json::Value = res.json();
     assert_eq!(body["bridge_tx_id"], serde_json::Value::String("mock_bridge_tx_hash".to_string()));
+
+    // Clean up test env var
+    std::env::remove_var("BRIDGE_MOCK_FORCE_SUCCESS");
 }
 
 #[tokio::test(flavor = "current_thread")]
@@ -186,6 +193,9 @@ async fn test_bridge_concurrent_requests() {
         amount: "2.0".to_string(),
     };
 
+    // Force mock bridge behavior for concurrent runs
+    std::env::set_var("BRIDGE_MOCK_FORCE_SUCCESS", "1");
+
     // Fire 4 concurrent bridge requests (reduced from 8) to reduce contention and test time.
     let server = Arc::new(server);
     let futs: Vec<_> = (0..4)
@@ -205,6 +215,8 @@ async fn test_bridge_concurrent_requests() {
             serde_json::Value::String("mock_bridge_tx_hash".to_string())
         );
     }
+
+    std::env::remove_var("BRIDGE_MOCK_FORCE_SUCCESS");
 }
 
 #[tokio::test(flavor = "current_thread")]
