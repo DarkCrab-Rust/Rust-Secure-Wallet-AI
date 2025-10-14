@@ -56,7 +56,7 @@ pub async fn mock_bridge_transfer(
         ));
     }
 
-    let simulated_tx_hash = format!("0x_simulated_lock_tx_{}", Uuid::new_v4());
+    let simulated_tx_hash = format!("0x_simulated_tx_{}", Uuid::new_v4());
     Ok(simulated_tx_hash)
 }
 
@@ -94,17 +94,8 @@ fn bridge_force_success_enabled() -> bool {
 
 pub async fn mock_check_transfer_status(tx_hash: &str) -> Result<BridgeTransactionStatus> {
     // If this is a simulated tx produced by mock_bridge_transfer, always treat as Completed.
-    if tx_hash.starts_with("0x_simulated_tx_") || tx_hash.starts_with("0x_simulated_lock_tx_") {
+    if tx_hash.starts_with("0x_simulated_tx_") {
         return Ok(BridgeTransactionStatus::Completed);
-    }
-
-    // If the tx contains an explicit failed marker, return Failed even when mocks
-    // are enabled. This allows tests to mark a transaction as failed and assert
-    // the behavior deterministically.
-    if tx_hash.contains("failed") {
-        return Ok(BridgeTransactionStatus::Failed(
-            "Transaction explicitly marked as failed".to_string(),
-        ));
     }
 
     // If tests explicitly force success via env, short-circuit and clear any previous counters.

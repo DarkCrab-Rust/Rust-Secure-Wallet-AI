@@ -181,7 +181,6 @@ fn concurrent_operations() {
     }
 }
 
-#[cfg(feature = "bls-tests")]
 #[test]
 fn bls12_381_serialization() {
     use blsful::inner_types::{G1Projective, G2Projective, Scalar as BlsScalar};

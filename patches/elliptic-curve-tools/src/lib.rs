@@ -18,11 +18,3 @@ pub mod tests {
         true
     }
 }
-
-// Expose the sop helper when requested so external tests can import it as
-// `elliptic_curve_tools::sum_of_products_impl_relaxed`.
-#[cfg(any(feature = "sop_patch_tests", test))]
-pub mod sop;
-
-#[cfg(any(feature = "sop_patch_tests", test))]
-pub use crate::sop::sum_of_products_impl_relaxed;

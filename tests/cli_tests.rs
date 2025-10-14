@@ -115,9 +115,8 @@ fn test_cli_parse_balance() {
     let args = vec!["hot_wallet", "balance", "--name", "test_wallet"];
     let cli = Cli::try_parse_from(args).unwrap();
     match cli.command {
-        Commands::Balance { name, network } => {
+        Commands::Balance { name } => {
             assert_eq!(name, "test_wallet");
-            assert!(network.is_none());
         }
         _ => panic!("Expected Balance command"),
     }

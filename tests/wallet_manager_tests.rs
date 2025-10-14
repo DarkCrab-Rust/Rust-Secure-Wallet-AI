@@ -142,17 +142,8 @@ async fn test_send_transaction_negative_amount() {
 #[tokio::test(flavor = "current_thread")]
 async fn test_bridge_assets_basic() {
     let wm = create_test_wallet_manager().await;
-    // Ensure the test wallet exists so bridge_assets can load its keys.
-    wm.create_wallet("bridge_wallet", false).await.unwrap();
-    // Enable mock bridge deterministic success for this test.
-    std::env::set_var("BRIDGE_MOCK_FORCE_SUCCESS", "1");
     // mock/实现层在测试里通常返回固定 mock 值，断言接口契约
     let result = wm.bridge_assets("bridge_wallet", "eth", "solana", "USDC", "10.0").await;
-    // Clear the env var so other tests are not affected.
-    std::env::remove_var("BRIDGE_MOCK_FORCE_SUCCESS");
-    if let Err(e) = &result {
-        println!("bridge_assets returned Err: {}", e);
-    }
     assert!(result.is_ok());
     cleanup(wm).await;
 }
@@ -174,7 +165,7 @@ async fn test_backup_and_restore_flow_stubs() {
     let seed = wm.backup_wallet("backup_wallet").await.unwrap();
     assert!(seed.split_whitespace().count() >= 12); // 至少 12 词，兼容不同实现
                                                     // restore 使用同样的助记词（stub 实现可能总是成功）
-    let res = wm.restore_wallet("restored_wallet", seed.as_str(), false).await;
+    let res = wm.restore_wallet("restored_wallet", seed.as_str()).await;
     assert!(res.is_ok());
     cleanup(wm).await;
 }
