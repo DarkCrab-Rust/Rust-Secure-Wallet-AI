@@ -88,14 +88,45 @@ impl I18nManager {
 
 pub fn init_default_languages() -> Result<I18nManager> {
     let mut manager = I18nManager::new("en".to_string());
+    // If the build enables bundled resources, use the embedded FTL files.
+    // Otherwise, attempt to load from disk at runtime; if files are missing,
+    // fall back to small built-in defaults to keep the core repo minimal.
 
-    // Load English
-    let en_content = include_str!("../../resources/i18n/en.ftl");
-    manager.load_language("en", en_content)?;
+    #[cfg(feature = "bundled-resources")]
+    {
+        // Load English from compiled-in bundled path under src/i18n/bundled
+        let en_content = include_str!("bundled/en.ftl");
+        manager.load_language("en", en_content)?;
 
-    // Load Chinese
-    let zh_content = include_str!("../../resources/i18n/zh.ftl");
-    manager.load_language("zh", zh_content)?;
+        // Load Chinese
+        let zh_content = include_str!("bundled/zh.ftl");
+        manager.load_language("zh", zh_content)?;
+    }
+
+    #[cfg(not(feature = "bundled-resources"))]
+    {
+        use std::fs;
+        // Try to read English from disk
+        match fs::read_to_string("resources/i18n/en.ftl") {
+            Ok(s) => { manager.load_language("en", &s)?; }
+            Err(_) => {
+                // Minimal default
+                let s = "hello = Hello\n";
+                manager.load_language("en", s)?;
+                warn!("Bundled i18n disabled and resources/i18n/en.ftl not found; using minimal defaults");
+            }
+        }
+
+        // Try to read Chinese from disk
+        match fs::read_to_string("resources/i18n/zh.ftl") {
+            Ok(s) => { manager.load_language("zh", &s)?; }
+            Err(_) => {
+                let s = "hello = 你好\n";
+                manager.load_language("zh", s)?;
+                warn!("Bundled i18n disabled and resources/i18n/zh.ftl not found; using minimal defaults");
+            }
+        }
+    }
 
     Ok(manager)
 }
