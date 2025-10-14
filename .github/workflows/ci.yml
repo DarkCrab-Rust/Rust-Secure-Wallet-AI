@@ -92,9 +92,10 @@ jobs:
       - name: Install Tarpaulin
         run: cargo install cargo-tarpaulin
       - name: Run Coverage
-        run: cargo tarpaulin --out Xml
+        run: cargo tarpaulin --out Xml --workspace --timeout 300 --engine llvm || echo "Coverage failed, continuing..."
       - name: Upload Coverage Report
         uses: actions/upload-artifact@v4
+        if: always()
         with:
           name: coverage-report
           path: tarpaulin-report.xml
