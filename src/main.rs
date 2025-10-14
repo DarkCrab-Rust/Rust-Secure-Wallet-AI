@@ -80,7 +80,6 @@ async fn main() -> Result<()> {
         },
         quantum_safe: false,
         multi_sig_threshold: 2,
-        hsm_required: false,
     };
 
     // Read API_KEY from environment
