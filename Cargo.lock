@@ -1764,12 +1764,14 @@ dependencies = [
 name = "elliptic-curve-tools"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "elliptic-curve 0.13.8",
  "k256",
  "p256",
  "rand 0.8.5",
  "serde",
  "serde_json",
+ "zeroize",
 ]
 
 [[package]]

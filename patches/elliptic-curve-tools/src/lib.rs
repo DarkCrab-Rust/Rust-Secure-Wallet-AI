@@ -4,7 +4,11 @@
 
 pub mod serdes;
 
-// removed unused import
+#[cfg(feature = "sop_patch_tests")]
+pub mod sop;
+
+#[cfg(feature = "sop_patch_tests")]
+pub use sop::sum_of_products_impl_relaxed;
 
 /// Placeholder function
 pub fn placeholder() -> bool {

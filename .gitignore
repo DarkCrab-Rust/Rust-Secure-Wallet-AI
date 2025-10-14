@@ -4,6 +4,13 @@ defi-target/
 
 # Generated wallet files (do not commit)
 wallet.json
+wallets.db
+.wallets.db
+
+# Test logs and artifacts
+cargo-test.log
+test.log
+TEMP*.txt
 
 # Environment files (secrets — do not commit)
 .env

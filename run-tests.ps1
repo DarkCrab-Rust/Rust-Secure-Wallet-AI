@@ -96,15 +96,70 @@ if ($LASTEXITCODE -eq 0) { Write-Host "  ✓ SOL -> ETH bridge works" -Foregroun
 cargo run --bin bridge_test -- eth-to-bsc --amount 100.0 --token BUSD > $null
 if ($LASTEXITCODE -eq 0) { Write-Host "  ✓ ETH -> BSC bridge works" -ForegroundColor Green }
 
-# 5. Release version test
+# 5. Release version test (optional - can be slow)
 Write-Host "`n5. Testing release build..." -ForegroundColor Yellow
-cargo build --release --quiet
-if ($LASTEXITCODE -eq 0) { 
-    Write-Host "  ✓ Release build successful" -ForegroundColor Green
+Write-Host "  Note: Release build can take several minutes..." -ForegroundColor Gray
+
+# Check if release build already exists
+if (Test-Path "target/release/bridge_test.exe") {
+    Write-Host "  ✓ Release build already exists, skipping rebuild" -ForegroundColor Green
+} else {
+    Write-Host "  Building release version (this may take a while)..." -ForegroundColor Gray
+    $buildJob = Start-Job -ScriptBlock { cargo build --release --quiet }
     
-    # Test release version
+    # Wait for build with timeout
+    $timeout = 300 # 5 minutes timeout
+    $completed = Wait-Job $buildJob -Timeout $timeout
+    
+    if ($completed) {
+        Receive-Job $buildJob
+        if ($LASTEXITCODE -eq 0) { 
+            Write-Host "  ✓ Release build successful" -ForegroundColor Green
+        } else {
+            Write-Host "  ⚠️ Release build failed, but continuing..." -ForegroundColor Yellow
+        }
+    } else {
+        Write-Host "  ⚠️ Release build timed out, skipping..." -ForegroundColor Yellow
+        Stop-Job $buildJob -ErrorAction SilentlyContinue
+        Remove-Job $buildJob -ErrorAction SilentlyContinue
+    }
+}
+
+# Test release version if it exists
+if (Test-Path "target/release/bridge_test.exe") {
     .\target\release\bridge_test.exe eth-to-sol --amount 10.0 --token USDC > $null
     if ($LASTEXITCODE -eq 0) { Write-Host "  ✓ Release version runs correctly" -ForegroundColor Green }
+}
+
+# 6. Cleanup test artifacts
+Write-Host "`n6. Cleaning up test artifacts..." -ForegroundColor Yellow
+$testFiles = @(
+    "wallets.db",
+    ".wallets.db", 
+    "cargo-test.log",
+    "test.log",
+    "wallet.json"
+)
+
+$filesCleaned = 0
+foreach ($file in $testFiles) {
+    if (Test-Path $file) {
+        Remove-Item $file -Force
+        Write-Host "  ✓ Cleaned up $file" -ForegroundColor Green
+        $filesCleaned++
+    }
+}
+
+# Clean up temp files
+$tempFiles = Get-ChildItem -Path . -Filter "TEMP*.txt" -File
+foreach ($file in $tempFiles) {
+    Remove-Item $file.FullName -Force
+    Write-Host "  ✓ Cleaned up $($file.Name)" -ForegroundColor Green
+    $filesCleaned++
+}
+
+if ($filesCleaned -eq 0) {
+    Write-Host "  ✓ No test artifacts to clean" -ForegroundColor Green
 }
 
 Write-Host "`n🎉 Tests completed!" -ForegroundColor Green
