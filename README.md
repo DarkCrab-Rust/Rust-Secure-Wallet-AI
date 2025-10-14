@@ -1,5 +1,9 @@
 # DeFi Hot Wallet - Rust Edition
 
+> NOTE: This repository has been split. This repository now contains only the "wallet core" (core services, crypto, blockchain clients, storage and tests).
+> The original full-repository (docs, examples, tools, vendor, and other non-core components) is preserved on the branch `legacy-full-repo` in this same remote. If you need the full history or the archived artifacts, see the `legacy-full-repo` branch.
+
+
 🔒 **DeFi热钱包，Rust打造，安全如堡垒！** 35天自研MVP，为DeFi玩家量身定制。
 
 [![Rust](https://img.shields.io/badge/rust-1.70+-orange.svg)](https://www.rust-lang.org)
@@ -364,6 +368,21 @@ cargo clippy -- -D warnings
 
 # 安全审计 / Security audit
 cargo audit
+
+## 迁移说明 / Migration note
+
+注意：为了加强库的秘密处理安全性，`secret_from_vec` 这一 crate 根级别的便利函数已被移除（破坏性变更）。
+外部使用者请直接调用 SecretVec 的关联函数：
+
+```rust
+// 旧用法（已移除）
+// let s = defi_hot_wallet::SecretVec::from_vec(vec![..]);
+
+// 新用法（请使用）
+let s = defi_hot_wallet::SecretVec::from_vec(vec![..]);
+```
+
+该变更旨在强制使用显式、消耗性的构造器以减少秘密复制的风险。如果你在升级时遇到编译错误，请全局搜寻 `secret_from_vec` 并替换为 `SecretVec::from_vec`。在 CI 中我们也添加了静态检查以避免不安全的便捷 API 被重新引入。
 ```
 
 ## 📜 许可证 / License
