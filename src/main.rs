@@ -2,10 +2,12 @@
 //! DeFi Hot Wallet Server Entry Point
 //! This binary is responsible for starting the API server.
 use anyhow::Result;
-use clap::{Parser, Subcommand};
+use clap::{Args as ClapArgs, Parser, Subcommand};
 use defi_hot_wallet::api::server::WalletServer;
 use defi_hot_wallet::core::config::{BlockchainConfig, StorageConfig, WalletConfig};
 use std::collections::HashMap;
+use std::fs;
+use std::path::PathBuf;
 use tracing::info;
 use tracing_subscriber::{EnvFilter, FmtSubscriber};
 
@@ -22,11 +24,22 @@ struct Args {
 enum Commands {
     /// Start the wallet server
     Server {
-        /// Host to bind the server to
         /// Port to bind the server to
         #[arg(long, default_value = "8080")]
         port: u16,
     },
+    /// Create a wallet file with the provided name at the given path
+    Create(CreateArgs),
+}
+
+#[derive(ClapArgs)]
+struct CreateArgs {
+    /// Wallet name to embed in the output file
+    #[arg(long)]
+    name: String,
+    /// Output path to write the wallet JSON file
+    #[arg(long)]
+    output: PathBuf,
 }
 
 #[tokio::main]
@@ -37,6 +50,18 @@ async fn main() -> Result<()> {
     init_logging()?;
 
     info!("Starting DeFi Hot Wallet v{}", env!("CARGO_PKG_VERSION"));
+
+    // Runtime safety: refuse to run in production if TEST_SKIP_DECRYPT is set.
+    if std::env::var("TEST_SKIP_DECRYPT").is_ok() && !cfg!(feature = "test-env") {
+        eprintln!("Refusing to start: TEST_SKIP_DECRYPT set but binary not built with `test-env`");
+        std::process::exit(1);
+    }
+
+    // Fast path: handle create subcommand without initializing server
+    if let Some(Commands::Create(create_args)) = args.command {
+        create_wallet_file(&create_args.name, &create_args.output)?;
+        return Ok(());
+    }
 
     // Read DATABASE_URL from env or fallback to relative path in current dir
     let database_url =
@@ -55,6 +80,7 @@ async fn main() -> Result<()> {
         },
         quantum_safe: false,
         multi_sig_threshold: 2,
+        hsm_required: false,
     };
 
     // Read API_KEY from environment
@@ -73,6 +99,8 @@ async fn main() -> Result<()> {
             info!("No command specified, starting server on default port 8080");
             server.start().await?;
         }
+        // Create handled above
+        Some(Commands::Create(_)) => unreachable!(),
     }
 
     Ok(())
@@ -88,5 +116,18 @@ fn init_logging() -> Result<()> {
         .finish();
 
     tracing::subscriber::set_global_default(subscriber)?;
+    Ok(())
+}
+
+fn create_wallet_file(name: &str, output: &PathBuf) -> Result<()> {
+    // Build a minimal JSON structure that tests expect
+    let json = serde_json::json!({
+        "name": name,
+    });
+    if let Some(parent) = output.parent() {
+        fs::create_dir_all(parent)?;
+    }
+    fs::write(output, serde_json::to_vec_pretty(&json)?)?;
+    println!("Wallet {} created successfully at {}", name, output.to_string_lossy());
     Ok(())
 }

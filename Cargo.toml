@@ -8,7 +8,6 @@ license = "MIT OR Apache-2.0"
 repository = "https://github.com/Yinhang3377/Defi-Hot-wallet-Rust"
 keywords = ["blockchain", "defi", "wallet", "quantum-safe", "cryptography"]
 categories = ["cryptography", "command-line-utilities", "network-programming"]
-autobins = false
 
 [lib]
 name = "defi_hot_wallet"
