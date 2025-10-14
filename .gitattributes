@@ -1,4 +1,19 @@
-* text=auto
+legacy/** linguist-vendored
+legacy/** linguist-generated
+legacy/** linguist-detectable=false
+vendor/** linguist-vendored
+static/** linguist-vendored
+docs/** linguist-vendored
+defi-target/** linguist-vendored
+defi-target/** linguist-generated
+Defi-Hot-wallet-Rust/** linguist-vendored
+Defi-Hot-wallet-Rust/** linguist-generated
+tarpaulin-report.html linguist-generated linguist-vendored
+tarpaulin-report*/** linguist-generated linguist-vendored
+target/** linguist-vendored
+tarpaulin-reports/** linguist-generated linguist-vendored
+*.md linguist-documentation
+README_LEGACY.md linguist-vendored text=auto
 
 # Force LF for source / config / test files
 *.rs      text eol=lf
@@ -11,3 +26,9 @@ Cargo.lock text eol=lf
 tests/**  text eol=lf
 src/**    text eol=lf
 * text=auto eol=lf
+
+# Mark legacy/ as vendored so GitHub linguist ignores it for language stats
+legacy/** linguist-vendored
+
+# Treat README_LEGACY as documentation
+README_LEGACY.md linguist-documentation

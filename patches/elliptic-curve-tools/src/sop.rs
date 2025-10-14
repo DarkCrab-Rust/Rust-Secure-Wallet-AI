@@ -1,10 +1,6 @@
 // ...existing code...
 #![allow(dead_code)]
 
-#[cfg(any(feature = "alloc", feature = "std"))]
-use crate::SumOfProducts;
-#[cfg(all(feature = "alloc", not(feature = "std")))]
-use alloc::{vec, vec::Vec};
 use anyhow::{anyhow, Result};
 use elliptic_curve::{ff::PrimeFieldBits, Group};
 #[cfg(feature = "std")]
@@ -25,15 +21,14 @@ use std::vec::Vec;
 #[cfg(any(feature = "alloc", feature = "std"))]
 pub fn sum_of_products<G>(scalars: &[G::Scalar], points: &[G]) -> Result<G>
 where
-    // 淇锛歋op 鏀逛负 SumOfProducts
-    G: Group + SumOfProducts + zeroize::DefaultIsZeroes,
+    G: Group + zeroize::DefaultIsZeroes,
     G::Scalar: zeroize::DefaultIsZeroes + PrimeFieldBits,
 {
     if scalars.len() != points.len() {
         return Err(anyhow!("Mismatched lengths of scalars and points"));
     }
     let pairs: Vec<(G::Scalar, G)> = scalars.iter().cloned().zip(points.iter().cloned()).collect();
-    Ok(G::sum_of_products(&pairs))
+    Ok(sum_of_products_impl_relaxed(&pairs))
 }
 
 // 鍐呴儴瀹炵幇锛屼緵 trait 璋冪敤

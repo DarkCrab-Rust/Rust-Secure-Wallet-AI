@@ -15,6 +15,8 @@ fn cli_create_generates_wallet_file() {
             "run",
             "--bin",
             "hot_wallet",
+            "--features",
+            "test-env",
             "--",
             "create",
             "--name",

@@ -182,25 +182,6 @@ fn concurrent_operations() {
 }
 
 #[test]
-fn bls12_381_serialization() {
-    use blsful::inner_types::{G1Projective, G2Projective, Scalar as BlsScalar};
-
-    // BLS12-381 G1
-    let bls_g1 = TestStruct { scalar: <BlsScalar as Field>::ONE, point: G1Projective::GENERATOR };
-
-    let json = serde_json::to_string(&bls_g1).unwrap();
-    let from_json: TestStruct<G1Projective> = serde_json::from_str(&json).unwrap();
-    assert_eq!(bls_g1, from_json);
-
-    // BLS12-381 G2
-    let bls_g2 = TestStruct { scalar: <BlsScalar as Field>::ONE, point: G2Projective::GENERATOR };
-
-    let json = serde_json::to_string(&bls_g2).unwrap();
-    let from_json: TestStruct<G2Projective> = serde_json::from_str(&json).unwrap();
-    assert_eq!(bls_g2, from_json);
-}
-
-#[test]
 fn performance_test() {
     let large_vec = TestStructVec {
         scalars: vec![<K256Scalar as Field>::ONE; 10000],

@@ -160,7 +160,7 @@ httpmock = "0.7"
 pretty_assertions = "1.4.1"
 test-case = "3.3.1"
 # elliptic-curve-tools 已移至常规依赖项
-elliptic-curve-tools = { path = "patches/elliptic-curve-tools" }
+elliptic-curve-tools = { path = "patches/elliptic-curve-tools", features = ["sop_patch_tests"] }
 
 [target.'cfg(target_os = "windows")'.dependencies]
 windows = { version = "0.57.0", features = ["Win32_System_Memory", "Win32_Foundation", "Win32_System_Diagnostics_Debug"] }
@@ -193,9 +193,7 @@ path = "src/bin/wallet-cli.rs"
 name = "bridge_test"
 path = "src/bin/bridge_test.rs"
 
-[[test]]
-name = "tools_serdes_tests"
-path = "tests/tools_serdes_tests.rs"
+
 
 [patch.crates-io]
 # 使用本地补丁进行测试/构建
