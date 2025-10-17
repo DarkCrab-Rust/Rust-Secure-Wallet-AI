@@ -1,0 +1,6 @@
+# Exceptions (literal lines to ignore from grep output)
+hex::encode(address)
+hex::encode(pending_tx.tx_hash().as_bytes())
+WALLET_ENC_KEY
+TEST_SKIP_DECRYPT
+BRIDGE_MOCK_FORCE_SUCCESS
