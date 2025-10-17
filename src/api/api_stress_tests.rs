@@ -44,9 +44,9 @@ fn create_test_config() -> WalletConfig {
 async fn create_test_server() -> TestServer {
     ensure_stress_env();
     let config = create_test_config();
-    let api_key = Some("stress_api_key".to_string());
+    let api_key = Some(zeroize::Zeroizing::new("stress_api_key".as_bytes().to_vec()));
     // deterministic master key so creation/restore flows do not hit decrypt errors
-    let test_master_key = Some(vec![0u8; 32]);
+    let test_master_key = Some(defi_hot_wallet::security::secret::vec_to_secret(vec![0u8; 32]));
     let server = WalletServer::new_for_test(
         "127.0.0.1".to_string(),
         0,
@@ -162,7 +162,8 @@ async fn stress_test_backup_delete_restore_cycle() {
         .await;
     assert_eq!(b.status_code(), StatusCode::OK);
     let body: Value = b.json();
-    let seed = body["seed_phrase"].as_str().unwrap_or("").to_string();
+    assert_eq!(body["alg"], "PLAINTEXT");
+    let seed = body["ciphertext"].as_str().unwrap_or("").to_string();
     assert!(!seed.is_empty());
 
     // delete wallet

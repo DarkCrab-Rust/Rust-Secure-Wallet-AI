@@ -20,13 +20,24 @@ fn create_test_config() -> WalletConfig {
         },
         quantum_safe: false,
         multi_sig_threshold: 2,
+        derivation: Default::default(),
     }
 }
 
 async fn create_test_server() -> TestServer {
     let config = create_test_config();
-    let api_key = Some("test_api_key".to_string());
-    let server = WalletServer::new("127.0.0.1".to_string(), 0, config, api_key).await.unwrap();
+    let api_key = Some(zeroize::Zeroizing::new("test_api_key".as_bytes().to_vec()));
+    // Use deterministic test master key for consistent test results
+    let test_master_key = defi_hot_wallet::security::secret::vec_to_secret(vec![0u8; 32]); // 32 zero bytes for testing
+    let server = WalletServer::new_for_test(
+        "127.0.0.1".to_string(),
+        0,
+        config,
+        api_key,
+        Some(test_master_key),
+    )
+    .await
+    .unwrap();
     TestServer::new(server.create_router().await).unwrap()
 }
 
@@ -142,7 +153,8 @@ async fn test_backup_wallet() {
         .await;
     assert_eq!(response.status_code(), StatusCode::OK);
     let body: serde_json::Value = response.json();
-    assert!(body["seed_phrase"].is_string());
+    assert!(body["ciphertext"].is_string());
+    assert_eq!(body["alg"], "PLAINTEXT");
 }
 
 #[tokio::test]

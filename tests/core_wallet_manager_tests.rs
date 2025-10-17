@@ -1,4 +1,7 @@
 // ...existing code...
+// Include shared test helpers in this integration test crate.
+mod util;
+
 use defi_hot_wallet::core::config::WalletConfig;
 use defi_hot_wallet::core::WalletManager;
 use std::sync::Arc;
@@ -7,6 +10,10 @@ use tokio::sync::Mutex;
 
 // Small helper to reduce repetition and ensure all tests use in-memory DB by default.
 fn in_memory_config() -> WalletConfig {
+    // Ensure deterministic test-only environment (deterministic KEK and test flags)
+    // so quantum-safe flows and child process spawns work in tests.
+    util::set_test_env();
+
     let mut cfg = WalletConfig::default();
     cfg.storage.database_url = "sqlite::memory:".to_string();
     cfg
@@ -247,7 +254,8 @@ async fn test_backup_restore_flow() {
 
     let backup_result = manager.backup_wallet("backup_test").await;
     assert!(backup_result.is_ok());
-    let mnemonic = backup_result.unwrap();
+    let mnemonic_z = backup_result.unwrap();
+    let mnemonic = String::from_utf8(mnemonic_z.to_vec()).expect("mnemonic utf8");
 
     manager.delete_wallet("backup_test").await.unwrap();
 
@@ -320,7 +328,9 @@ async fn test_get_wallet_address() {
 
     manager.create_wallet("address_test", true).await.unwrap();
 
-    let address = manager.derive_address(b"some_master_key", "eth");
+    // Use a proper 32-byte master key for derivation
+    let master_key = *b"0123456789abcdef0123456789abcdef"; // 32 bytes
+    let address = manager.derive_address(&master_key, "eth");
     assert!(address.is_ok());
 }
 

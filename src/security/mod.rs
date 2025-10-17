@@ -7,11 +7,22 @@
 pub mod access_control;
 pub mod compliance;
 pub mod encryption;
+pub mod env_manager;
 pub mod memory_protection;
 pub mod shamir;
+pub mod mnemonic_export;
+pub mod secret;
 
 // Add the new anti-debug module
 pub mod anti_debug;
 
 // Re-export commonly used security functions for convenience
 pub use anti_debug::is_debugger_present;
+pub use env_manager::{PermissionLevel, SecureEnvManager, SECURE_ENV_MANAGER};
+
+// Secret buffer alias re-export
+pub use secret::SecretVec;
+
+// Redaction helpers to avoid accidental secret prints
+pub mod redaction;
+pub use redaction::{redact_body, redact_hex_bytes};

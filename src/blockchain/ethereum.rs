@@ -5,7 +5,7 @@ use ethers::{
     prelude::{JsonRpcClient, *},
     providers::{Http, Provider},
     signers::{LocalWallet, Signer},
-    types::{Address, TransactionRequest, U256},
+    types::{Address, Eip1559TransactionRequest, NameOrAddress, U256},
     utils::parse_ether,
 };
 use std::{str::FromStr, time::Duration};
@@ -96,6 +96,10 @@ where
     // This bound is necessary for the `BlockchainClient` trait methods to be callable.
     P: Send + Sync,
 {
+    pub fn chain_id(&self) -> u64 {
+        self.chain_id
+    }
+
     /// Creates a new EthereumClient with a given provider.
     /// This is useful for testing with a `MockProvider`.
     pub fn new_with_provider(provider: Provider<P>) -> EthereumClient<P> {
@@ -107,15 +111,8 @@ where
     }
 
     fn create_wallet_from_private_key(&self, private_key: &[u8]) -> Result<LocalWallet> {
-        // Debug: print to stderr so test runs without initializing tracing still show the info.
-        eprintln!(
-            "create_wallet_from_private_key: incoming private_key.len() = {}",
-            private_key.len()
-        );
-        eprintln!(
-            "create_wallet_from_private_key: bytes = {}",
-            hex::encode(&private_key[..std::cmp::min(32, private_key.len())])
-        );
+        // Validate length and create a wallet. Do NOT log key material.
+        tracing::debug!("create_wallet_from_private_key: incoming len = {}", private_key.len());
         if private_key.len() != 32 {
             return Err(anyhow::anyhow!("Private key must be 32 bytes"));
         }
@@ -128,11 +125,11 @@ where
     }
 
     pub async fn get_gas_price(&self) -> Result<U256> {
-        eprintln!("get_gas_price: called");
+        debug!("get_gas_price called");
         let res = self.provider.get_gas_price().await;
         match res {
             Ok(v) => {
-                eprintln!("get_gas_price: got = 0x{:x}", v);
+                debug!("get_gas_price got = 0x{:x}", v);
                 Ok(v)
             }
             Err(e) => Err(anyhow::anyhow!("Failed to get gas price: {}", e)),
@@ -140,11 +137,11 @@ where
     }
 
     pub async fn get_nonce(&self, address: &Address) -> Result<U256> {
-        eprintln!("get_nonce: called for address: 0x{}", hex::encode(address));
+        debug!(address = %hex::encode(address), "get_nonce called for address");
         let res = self.provider.get_transaction_count(*address, None).await;
         match res {
             Ok(v) => {
-                eprintln!("get_nonce: got = 0x{:x}", v);
+                debug!("get_nonce got = 0x{:x}", v);
                 Ok(v)
             }
             Err(e) => Err(anyhow::anyhow!("Failed to get nonce: {}", e)),
@@ -180,14 +177,15 @@ where
 
     async fn send_transaction(
         &self,
-        private_key: &[u8],
+        private_key: &crate::core::domain::PrivateKey,
         to: &str,
         amount: &str,
     ) -> Result<String, WalletError> {
         info!("Sending {} ETH to {}", amount, to);
 
-        // Create wallet from private key
-        let wallet = self.create_wallet_from_private_key(private_key).map_err(|e| {
+        // Create wallet from private key using scoped secret access
+        let wallet = private_key.with_secret(|pk_bytes| self.create_wallet_from_private_key(pk_bytes))
+            .map_err(|e| {
             WalletError::KeyDerivationError(format!(
                 "Failed to create wallet from private key: {}",
                 e
@@ -201,19 +199,27 @@ where
         let amount_wei = parse_ether(amount)
             .map_err(|e| WalletError::ValidationError(format!("Invalid amount: {}", e)))?;
 
-        // Get current gas price and nonce
+        // Get current gas price and optionally use provided nonce
         let gas_price = self.get_gas_price().await?;
         let nonce = self.get_nonce(&wallet.address()).await?;
-        eprintln!("send_transaction: gas_price = 0x{:x}", gas_price);
-        eprintln!("send_transaction: nonce = 0x{:x}", nonce);
+        debug!("send_transaction: gas_price = 0x{:x}", gas_price);
+        debug!("send_transaction: nonce = 0x{:x}", nonce);
 
-        // Create transaction
-        let tx = TransactionRequest::new()
-            .to(to_address)
-            .value(amount_wei)
-            .gas_price(gas_price)
-            .gas(21000u64) // Standard ETH transfer gas limit
-            .nonce(nonce);
+        // Create EIP-1559 transaction (type-2). Derive simple fee settings from gas_price as fallback.
+        // Note: This enforces proper chain_id signing via LocalWallet::with_chain_id in create_wallet_from_private_key.
+        let max_fee_per_gas = gas_price.saturating_mul(U256::from(2u64));
+        let max_priority_fee_per_gas =
+            (gas_price / U256::from(10u64)).max(U256::from(1_000_000_000u64)); // >= 1 gwei
+
+        let tx = Eip1559TransactionRequest {
+            to: Some(NameOrAddress::Address(to_address)),
+            value: Some(amount_wei),
+            gas: Some(U256::from(21000u64)),
+            nonce: Some(nonce),
+            max_fee_per_gas: Some(max_fee_per_gas),
+            max_priority_fee_per_gas: Some(max_priority_fee_per_gas),
+            ..Default::default()
+        };
 
         // Sign and send transaction
         let client = SignerMiddleware::new(self.provider.clone(), wallet);
@@ -222,9 +228,75 @@ where
             WalletError::BlockchainError(format!("Failed to send transaction: {}", e))
         })?;
 
-        let tx_hash = format!("{:?}", pending_tx.tx_hash());
+        // Convert H256 hash to a canonical 0x-prefixed hex string for logs/returns.
+        let tx_hash = format!("0x{}", hex::encode(pending_tx.tx_hash().as_bytes()));
 
-        info!("Transaction sent: {}", tx_hash);
+        info!(tx_hash = %tx_hash, "Transaction sent");
+        Ok(tx_hash)
+    }
+
+    /// Allow callers to provide an explicit nonce. If None is provided, fall back
+    /// to the default behavior (querying the chain for a nonce).
+    async fn send_transaction_with_nonce(
+        &self,
+        private_key: &crate::core::domain::PrivateKey,
+        to: &str,
+        amount: &str,
+        nonce: Option<u64>,
+    ) -> Result<String, WalletError> {
+        info!("Sending {} ETH to {} (nonce override: {:?})", amount, to, nonce);
+
+        // Create wallet from private key using scoped secret access
+        let wallet = private_key.with_secret(|pk_bytes| self.create_wallet_from_private_key(pk_bytes))
+            .map_err(|e| {
+            WalletError::KeyDerivationError(format!(
+                "Failed to create wallet from private key: {}",
+                e
+            ))
+        })?;
+
+        // Parse addresses and amount
+        let to_address = Address::from_str(to)
+            .map_err(|e| WalletError::AddressError(format!("Invalid recipient address: {}", e)))?;
+
+        let amount_wei = parse_ether(amount)
+            .map_err(|e| WalletError::ValidationError(format!("Invalid amount: {}", e)))?;
+
+        // Get current gas price and optionally use provided nonce
+        let gas_price = self.get_gas_price().await?;
+        let nonce_u256 = if let Some(n) = nonce {
+            U256::from(n)
+        } else {
+            self.get_nonce(&wallet.address()).await?
+        };
+
+        debug!("send_transaction: gas_price = 0x{:x}", gas_price);
+        debug!("send_transaction: nonce = 0x{:x}", nonce_u256);
+
+        let max_fee_per_gas = gas_price.saturating_mul(U256::from(2u64));
+        let max_priority_fee_per_gas =
+            (gas_price / U256::from(10u64)).max(U256::from(1_000_000_000u64)); // >= 1 gwei
+
+        let tx = Eip1559TransactionRequest {
+            to: Some(NameOrAddress::Address(to_address)),
+            value: Some(amount_wei),
+            gas: Some(U256::from(21000u64)),
+            nonce: Some(nonce_u256),
+            max_fee_per_gas: Some(max_fee_per_gas),
+            max_priority_fee_per_gas: Some(max_priority_fee_per_gas),
+            ..Default::default()
+        };
+
+        // Sign and send transaction
+        let client = SignerMiddleware::new(self.provider.clone(), wallet);
+
+        let pending_tx = client.send_transaction(tx, None).await.map_err(|e| {
+            WalletError::BlockchainError(format!("Failed to send transaction: {}", e))
+        })?;
+
+        let tx_hash = format!("0x{}", hex::encode(pending_tx.tx_hash().as_bytes()));
+
+        info!(tx_hash = %tx_hash, "Transaction sent");
         Ok(tx_hash)
     }
 
@@ -300,6 +372,22 @@ where
         Ok(block_number.as_u64())
     }
 
+    async fn get_nonce(&self, address: &str) -> Result<u64, WalletError> {
+        debug!("Getting nonce for address: {}", address);
+
+        let address = Address::from_str(address)
+            .map_err(|e| WalletError::AddressError(format!("Invalid Ethereum address: {}", e)))?;
+
+        let nonce = self
+            .provider
+            .get_transaction_count(address, None)
+            .await
+            .map_err(|e| WalletError::BlockchainError(format!("Failed to get nonce: {}", e)))?;
+
+        debug!("Current nonce: {}", nonce);
+        Ok(nonce.as_u64())
+    }
+
     fn validate_address(&self, address: &str) -> anyhow::Result<bool> {
         match Address::from_str(address) {
             Ok(_) => Ok(true),
@@ -331,9 +419,13 @@ mod tests {
 
     #[test]
     fn create_wallet_from_private_key_success() {
-        let client = make_local_client();
+        let _client = make_local_client();
         let key = [0x11u8; 32];
-        let wallet = client.create_wallet_from_private_key(&key).expect("should create wallet");
+        // Use the helper call to validate that wallet creation works; call via helper directly
+        let wallet =
+            EthereumClient::new_with_provider(Provider::try_from("http://127.0.0.1:8545").unwrap())
+                .create_wallet_from_private_key(&key)
+                .expect("should create wallet");
         let _addr = wallet.address(); // basic smoke check
     }
 
@@ -349,12 +441,11 @@ mod tests {
 
     #[tokio::test(flavor = "current_thread")]
     async fn send_transaction_short_key_fails_fast() {
-        let client = make_local_client();
+        let _client = make_local_client();
         let short_key = [0u8; 16];
-        let res = client
-            .send_transaction(&short_key, "0x0000000000000000000000000000000000000000", "0.1")
-            .await;
-        assert!(res.is_err());
+        // Construction of PrivateKey should fail for short keys
+        let try_pk = crate::core::domain::PrivateKey::try_from_slice(&short_key);
+        assert!(try_pk.is_err());
     }
 
     #[test]

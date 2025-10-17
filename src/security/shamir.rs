@@ -1,17 +1,5 @@
-// ...existing code...
-use std::collections::HashMap;
-use std::sync::{Mutex, OnceLock};
-
+use rand::Rng;
 use thiserror::Error;
-
-/// In-process metadata map to remember threshold used when splitting a given secret.
-/// Keyed by secret bytes ([u8;32]) so combine_shares can validate "insufficient shares"
-/// in placeholder implementation used by tests.
-static SHAMIR_METADATA: OnceLock<Mutex<HashMap<[u8; 32], u8>>> = OnceLock::new();
-
-fn metadata_map() -> &'static Mutex<HashMap<[u8; 32], u8>> {
-    SHAMIR_METADATA.get_or_init(|| Mutex::new(HashMap::new()))
-}
 
 /// Shamir secret sharing related error types for the security layer.
 #[derive(Debug, Error)]
@@ -26,121 +14,166 @@ pub enum ShamirError {
     CombineFailed(String),
 }
 
-/// Splits a secret (must be exactly 32 bytes) into `total_shares` shares with threshold `threshold`.
-///
-/// Returns Vec<(id, payload)> where payload is a [u8; 32] array and id is in 1..=total_shares.
-///
-/// NOTE: placeholder implementation — replicates the secret into each share. It stores
-/// the threshold in process metadata so combine_shares can validate insufficient-share cases
-/// for the current test-suite. Replace with a real Shamir implementation in production.
+// GF(2^8) constants and arithmetic (AES polynomial 0x11b -> 0x1b variant)
+const POLY: u8 = 0x1b;
+
+fn gf_mul(mut a: u8, mut b: u8) -> u8 {
+    let mut r: u8 = 0;
+    while b != 0 {
+        if (b & 1) != 0 {
+            r ^= a;
+        }
+        let hi = (a & 0x80) != 0;
+        a <<= 1;
+        if hi {
+            a ^= POLY;
+        }
+        b >>= 1;
+    }
+    r
+}
+
+fn gf_pow(mut a: u8, mut e: u8) -> u8 {
+    if e == 0 {
+        return 1;
+    }
+    let mut r = 1u8;
+    while e != 0 {
+        if (e & 1) != 0 {
+            r = gf_mul(r, a);
+        }
+        a = gf_mul(a, a);
+        e >>= 1;
+    }
+    r
+}
+
+fn gf_inv(a: u8) -> u8 {
+    if a == 0 {
+        panic!("gf_inv(0)");
+    }
+    gf_pow(a, 0xfe)
+}
+
+fn eval_poly_at(coeffs: &[u8], x: u8) -> u8 {
+    let mut result = 0u8;
+    let mut xp = 1u8;
+    for &c in coeffs.iter() {
+        result ^= gf_mul(c, xp);
+        xp = gf_mul(xp, x);
+    }
+    result
+}
+
+/// Split a 32-byte secret into `total_shares` byte-array shares with threshold `threshold`.
 pub fn split_secret<S: AsRef<[u8]>>(
     secret: S,
     threshold: u8,
     total_shares: u8,
 ) -> Result<Vec<(u8, [u8; 32])>, ShamirError> {
+    use std::num::NonZeroU8;
     let s = secret.as_ref();
-
-    if threshold == 0 {
-        return Err(ShamirError::InvalidParameters("threshold (k) must be > 0".to_string()));
-    }
-    if total_shares == 0 {
-        return Err(ShamirError::InvalidParameters("total_shares (n) must be > 0".to_string()));
-    }
-    if threshold > total_shares {
+    let k = NonZeroU8::new(threshold)
+        .ok_or_else(|| ShamirError::InvalidParameters("Threshold cannot be zero".to_string()))?;
+    let n = NonZeroU8::new(total_shares)
+        .ok_or_else(|| ShamirError::InvalidParameters("Total shares cannot be zero".to_string()))?;
+    if k > n {
         return Err(ShamirError::InvalidParameters(
-            "threshold (k) cannot be greater than total_shares (n)".to_string(),
+            "Threshold cannot be greater than total shares".to_string(),
         ));
     }
     if s.len() != 32 {
-        return Err(ShamirError::InvalidParameters("secret must be exactly 32 bytes".to_string()));
+        return Err(ShamirError::InvalidParameters("Secret must be exactly 32 bytes".to_string()));
     }
 
-    let mut arr = [0u8; 32];
-    arr.copy_from_slice(&s[..32]);
-
-    // store threshold for this secret so combine_shares can validate insufficient shares
-    {
-        let mut map = metadata_map().lock().expect("mutex poisoned");
-        map.insert(arr, threshold);
+    // build per-byte polynomials
+    let mut rng = rand::rngs::OsRng;
+    let mut coeffs_per_byte: Vec<Vec<u8>> = Vec::with_capacity(32);
+    for &b in s.iter().take(32) {
+        let mut coeffs = vec![0u8; threshold as usize];
+        coeffs[0] = b;
+        for coeff in coeffs.iter_mut().skip(1) {
+            *coeff = rng.gen();
+        }
+        coeffs_per_byte.push(coeffs);
     }
 
-    // create placeholder shares: each share is (id, payload)
-    let mut out = Vec::with_capacity(total_shares as usize);
-    for i in 0..total_shares {
-        out.push(((i.wrapping_add(1)), arr));
+    let mut shares: Vec<(u8, [u8; 32])> = Vec::with_capacity(total_shares as usize);
+    for id in 1..=total_shares {
+        let x = id;
+        let mut payload = [0u8; 32];
+        for byte_idx in 0..32 {
+            payload[byte_idx] = eval_poly_at(&coeffs_per_byte[byte_idx], x);
+        }
+        shares.push((id, payload));
     }
-    Ok(out)
+    Ok(shares)
 }
 
-/// Combine shares provided as tuples Vec<(u8, [u8;32])>.
-/// Placeholder behavior:
-/// - validate non-empty
-/// - validate unique ids
-/// - check stored threshold for this secret and require >= threshold shares
-/// - return payload of first share (since placeholder replicates secret)
-pub fn combine_shares(shares: &[(u8, [u8; 32])]) -> Result<[u8; 32], ShamirError> {
+/// Combine shares (id, [u8;32]) using Lagrange interpolation in GF(2^8).
+pub fn combine_shares(shares: &[(u8, [u8; 32])], threshold: u8) -> Result<[u8; 32], ShamirError> {
     if shares.is_empty() {
         return Err(ShamirError::InvalidParameters("shares must not be empty".to_string()));
     }
+    if threshold == 0 {
+        return Err(ShamirError::InvalidParameters("threshold cannot be zero".to_string()));
+    }
+    if shares.len() < threshold as usize {
+        return Err(ShamirError::CombineFailed("Insufficient shares for recovery".to_string()));
+    }
 
-    // validate uniqueness of ids
+    // validate ids unique and non-zero
     let mut ids = std::collections::HashSet::new();
-    for (i, (id, _)) in shares.iter().enumerate() {
+    for (id, _payload) in shares.iter() {
+        if *id == 0 {
+            return Err(ShamirError::InvalidParameters("share id cannot be zero".to_string()));
+        }
         if !ids.insert(*id) {
             return Err(ShamirError::InvalidParameters(format!(
-                "duplicate share id found at index {}: {}",
-                i, id
+                "duplicate share id found: {}",
+                id
             )));
         }
     }
 
-    // infer secret candidate from first share payload
-    let candidate = shares[0].1;
+    // Lagrange interpolation per-byte
+    let k = threshold as usize;
+    let xs: Vec<u8> = shares.iter().map(|(id, _)| *id).collect();
+    let mut secret = [0u8; 32];
 
-    // look up threshold from metadata inserted by split_secret
-    let maybe_threshold = {
-        let map = metadata_map().lock().expect("mutex poisoned");
-        map.get(&candidate).cloned()
-    };
+    for (byte_idx, secret_byte) in secret.iter_mut().enumerate().take(32) {
+        let mut acc = 0u8;
+        for j in 0..k {
+            let xj = xs[j];
+            let yj = shares[j].1[byte_idx];
 
-    if let Some(threshold) = maybe_threshold {
-        if (shares.len() as u8) < threshold {
-            return Err(ShamirError::InvalidParameters(format!(
-                "insufficient shares: {} provided, need {}",
-                shares.len(),
-                threshold
-            )));
+            let mut num = 1u8;
+            let mut den = 1u8;
+            for (m, &xm) in xs.iter().enumerate().take(k) {
+                if m == j {
+                    continue;
+                }
+                num = gf_mul(num, xm);
+                let diff = xm ^ xj;
+                if diff == 0 {
+                    return Err(ShamirError::CombineFailed(
+                        "Invalid share x difference zero".to_string(),
+                    ));
+                }
+                den = gf_mul(den, diff);
+            }
+            let inv_den = gf_inv(den);
+            let lj = gf_mul(num, inv_den);
+            let term = gf_mul(yj, lj);
+            acc ^= term;
         }
-    } else {
-        // If we don't have metadata, be conservative and require at least 2 shares for recovery.
-        // Tests expect an error when insufficient relative to original threshold; absence of metadata
-        // indicates split_secret wasn't called in-process, so fail to avoid silent success.
-        if shares.len() < 2 {
-            return Err(ShamirError::InvalidParameters(
-                "insufficient shares and unknown original threshold".to_string(),
-            ));
-        }
+        *secret_byte = acc;
     }
 
-    // If all payloads are identical, return that payload (placeholder for real recovery).
-    let all_same = shares.iter().all(|(_, p)| p == &candidate);
-    if all_same {
-        return Ok(candidate);
-    }
-
-    // Payloads differ -> produce deterministic but different result to reflect tampering.
-    // Use bytewise XOR across all payloads (placeholder behavior -> fails integrity if any share tampered).
-    let mut xor_res = [0u8; 32];
-    for &(_, payload) in shares.iter() {
-        for i in 0..32 {
-            xor_res[i] ^= payload[i];
-        }
-    }
-    Ok(xor_res)
+    Ok(secret)
 }
 
-/// Compatibility alias for older name.
-pub fn combine_secret(shares: &[(u8, [u8; 32])]) -> Result<[u8; 32], ShamirError> {
-    combine_shares(shares)
+/// Compatibility alias
+pub fn combine_secret(shares: &[(u8, [u8; 32])], threshold: u8) -> Result<[u8; 32], ShamirError> {
+    combine_shares(shares, threshold)
 }
-// ...existing code...

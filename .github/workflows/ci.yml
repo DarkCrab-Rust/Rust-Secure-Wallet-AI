@@ -135,4 +135,8 @@ jobs:
           set -e
           # Update advisory database then run audit
           cargo audit --version || true
-          cargo audit
+          # The optional `pkcs11` crate (RUSTSEC-2022-0034) is used only behind the
+          # `pkcs11-backend` feature. We intentionally ignore that advisory here
+          # because the crate is optional; please review SECURITY_NOTES.md before
+          # enabling the pkcs11-backend feature in production.
+          cargo audit --ignore RUSTSEC-2022-0034

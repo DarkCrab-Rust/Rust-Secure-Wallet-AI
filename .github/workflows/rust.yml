@@ -1,0 +1,34 @@
+name: Rust Check
+
+on:
+  push:
+    branches:
+      - '**'
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 安装 Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+          components: miri
+
+      - name: 安装 cargo-audit
+        run: cargo install cargo-audit
+
+      - name: 扫漏洞 (cargo audit)
+        run: cargo audit
+
+      - name: 设置 Miri
+        run: |
+          rustup component add miri
+          cargo miri setup
+
+      - name: 内存测试 (Miri)
+        run: cargo miri test

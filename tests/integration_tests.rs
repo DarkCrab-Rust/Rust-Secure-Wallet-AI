@@ -1,3 +1,5 @@
+mod util;
+
 use defi_hot_wallet::core::config::{BlockchainConfig, StorageConfig, WalletConfig};
 use defi_hot_wallet::core::WalletManager;
 use std::collections::HashMap;
@@ -16,11 +18,14 @@ fn create_test_config() -> WalletConfig {
         },
         quantum_safe: false,
         multi_sig_threshold: 2,
+        derivation: Default::default(),
     }
 }
 
 #[tokio::test]
 async fn test_wallet_creation_and_bridge_integration() {
+    // Ensure deterministic test env for integration tests
+    util::set_test_env();
     // Create a test configuration
     let config = create_test_config();
 
@@ -45,6 +50,8 @@ async fn test_wallet_creation_and_bridge_integration() {
 
 #[tokio::test]
 async fn test_balance_and_transaction_integration() {
+    // Ensure deterministic test env for integration tests
+    util::set_test_env();
     // Note: This test requires actual blockchain connections or mocks
     // For now, it's a placeholder
     let config = create_test_config();

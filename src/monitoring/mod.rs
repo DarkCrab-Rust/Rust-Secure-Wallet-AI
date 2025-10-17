@@ -3,6 +3,7 @@ use prometheus::{Counter, Encoder, Gauge, Histogram, HistogramOpts, Registry, Te
 use std::sync::Arc;
 use tokio::sync::Mutex;
 use tracing::{error, info, warn};
+use crate::security::redaction::redact_body;
 
 pub struct WalletMetrics {
     registry: Registry,
@@ -260,11 +261,22 @@ impl SecurityMonitor {
             SecuritySeverity::Critical => "CRITICAL",
         };
 
+        // Map event type to a stable string and redact potentially-sensitive description
+        let event_type_str = match event.event_type {
+            SecurityEventType::UnauthorizedAccess => "UnauthorizedAccess",
+            SecurityEventType::SuspiciousTransaction => "SuspiciousTransaction",
+            SecurityEventType::MultipleFailedLogins => "MultipleFailedLogins",
+            SecurityEventType::UnusualLocation => "UnusualLocation",
+            SecurityEventType::QuantumAttackAttempt => "QuantumAttackAttempt",
+            SecurityEventType::MalformedRequest => "MalformedRequest",
+        };
+
+        let redacted_description = redact_body(&event.description);
         warn!(
             "馃毃 Security Event [{}]: {} - {}",
             severity_str,
-            format!("{:?}", event.event_type),
-            event.description
+            event_type_str,
+            redacted_description
         );
 
         // Store the event
@@ -330,8 +342,18 @@ impl SecurityMonitor {
     }
 
     async fn send_critical_alert(&self, event: &SecurityEvent) {
-        error!("馃毃 CRITICAL SECURITY ALERT: {:?} - {}", event.event_type, event.description);
+        // For critical events, redact details before logging externally.
+        let event_type_str = match event.event_type {
+            SecurityEventType::UnauthorizedAccess => "UnauthorizedAccess",
+            SecurityEventType::SuspiciousTransaction => "SuspiciousTransaction",
+            SecurityEventType::MultipleFailedLogins => "MultipleFailedLogins",
+            SecurityEventType::UnusualLocation => "UnusualLocation",
+            SecurityEventType::QuantumAttackAttempt => "QuantumAttackAttempt",
+            SecurityEventType::MalformedRequest => "MalformedRequest",
+        };
 
+        let redacted_desc = redact_body(&event.description);
+        error!("馃毃 CRITICAL SECURITY ALERT: {} - {}", event_type_str, redacted_desc);
         // In a real implementation, this would:
         // - Send webhook notifications
         // - Email administrators
@@ -339,9 +361,12 @@ impl SecurityMonitor {
         // - Possibly auto-lock affected wallets
 
         // For now, we'll just log it
+        // Avoid printing raw wallet IDs or IPs; redact them for logs unless DEV_PRINT_SECRETS=1
+        let redacted_ip = event.source_ip.as_deref().map(|s| redact_body(s));
+        let redacted_wallet = event.wallet_id.as_deref().map(|s| redact_body(s));
         error!(
             "Alert details: IP={:?}, Wallet={:?}, Time={}",
-            event.source_ip, event.wallet_id, event.timestamp
+            redacted_ip, redacted_wallet, event.timestamp
         );
     }
 }

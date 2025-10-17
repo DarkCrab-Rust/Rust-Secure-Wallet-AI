@@ -1,4 +1,6 @@
 // ...existing code...
+mod util;
+
 use defi_hot_wallet::core::config::WalletConfig;
 use defi_hot_wallet::core::WalletManager;
 
@@ -6,6 +8,7 @@ use defi_hot_wallet::core::WalletManager;
 /// These keep original functionality expectations while ensuring the file compiles.
 #[tokio::test(flavor = "current_thread")]
 async fn test_backup_create() {
+    util::set_test_env();
     let mut cfg = WalletConfig::default();
     cfg.storage.database_url = "sqlite::memory:".to_string();
     let manager = WalletManager::new(&cfg).await.unwrap();
@@ -17,6 +20,7 @@ async fn test_backup_create() {
 
 #[tokio::test(flavor = "current_thread")]
 async fn test_backup_flow_basic() {
+    util::set_test_env();
     let mut cfg = WalletConfig::default();
     cfg.storage.database_url = "sqlite::memory:".to_string();
     let manager = WalletManager::new(&cfg).await.unwrap();

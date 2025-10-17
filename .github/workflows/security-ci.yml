@@ -1,0 +1,45 @@
+name: Security CI
+
+on:
+  push:
+    branches: [ main, master, archive-bridge-stub ]
+  pull_request:
+    branches: [ main, master, archive-bridge-stub ]
+
+jobs:
+  security:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          profile: minimal
+          override: true
+
+      - name: Run formatting check
+        run: |
+          cargo fmt -- --check
+
+      - name: Run clippy (package)
+        run: |
+          cargo clippy -- -D warnings
+
+      - name: Run tests (with test-env)
+        run: |
+          cargo test --workspace --features test-env -- --nocapture
+
+      - name: Check for forbidden prints in library code
+        run: |
+          chmod +x ./scripts/check_no_prints.sh
+          ./scripts/check_no_prints.sh
+
+      - name: Install cargo-audit
+        run: |
+          cargo install cargo-audit --locked
+
+      - name: Run cargo-audit
+        run: |
+          cargo audit --deny warnings

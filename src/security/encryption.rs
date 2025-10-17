@@ -1,18 +1,22 @@
 // src/security/encryption.rs
+#![allow(deprecated)]
 //! 閽卞寘鍔犲瘑瀹夊叏妯″潡
 //! 鎻愪緵鍔犲瘑鍜屽畨鍏ㄧ浉鍏崇殑鍔熻兘
 
 use crate::tools::error::WalletError;
 use aes_gcm::aead::{Aead, KeyInit, Payload};
-use aes_gcm::{Aes256Gcm, Nonce};
+use aes_gcm::Aes256Gcm;
 use argon2::Argon2;
 use rand::rngs::OsRng;
 use rand::RngCore;
 use std::collections::HashMap;
 
+use crate::crypto::encryption_consistency::EncryptionAlgorithm;
+use crate::register_encryption_operation;
+
 /// 閽卞寘瀹夊叏绠＄悊鍣�
 pub struct WalletSecurity {
-    keys: HashMap<String, Vec<u8>>,
+    keys: HashMap<String, zeroize::Zeroizing<Vec<u8>>>,
 }
 
 impl WalletSecurity {
@@ -24,6 +28,7 @@ impl WalletSecurity {
     /// 鍔犲瘑鏁版嵁
     /// Output format: nonce(12) || ciphertext
     pub fn encrypt(&mut self, data: &[u8], key_id: &str) -> Result<Vec<u8>, WalletError> {
+        register_encryption_operation!("security_encrypt", EncryptionAlgorithm::Aes256Gcm, false);
         let key = self.get_or_create_key(key_id)?;
         let cipher = Aes256Gcm::new_from_slice(&key)
             .map_err(|_| WalletError::EncryptionError("Invalid key length".to_string()))?;
@@ -31,7 +36,8 @@ impl WalletSecurity {
         let mut nonce_bytes = [0u8; 12];
         let mut rng = OsRng;
         rng.fill_bytes(&mut nonce_bytes);
-        let nonce = Nonce::from_slice(&nonce_bytes);
+        #[allow(deprecated)]
+        let nonce = aes_gcm::aead::Nonce::<Aes256Gcm>::from_slice(&nonce_bytes);
 
         let ciphertext = cipher
             .encrypt(nonce, data)
@@ -43,7 +49,8 @@ impl WalletSecurity {
     }
 
     /// 瑙ｅ瘑鏁版嵁
-    pub fn decrypt(&mut self, data: &[u8], key_id: &str) -> Result<Vec<u8>, WalletError> {
+    pub fn decrypt(&mut self, data: &[u8], key_id: &str) -> Result<zeroize::Zeroizing<Vec<u8>>, WalletError> {
+        register_encryption_operation!("security_decrypt", EncryptionAlgorithm::Aes256Gcm, false);
         if data.len() < 12 {
             return Err(WalletError::DecryptionError("Data too short".to_string()));
         }
@@ -52,29 +59,34 @@ impl WalletSecurity {
         let cipher = Aes256Gcm::new_from_slice(&key)
             .map_err(|_| WalletError::DecryptionError("Invalid key length".to_string()))?;
 
-        let nonce = Nonce::from_slice(&data[..12]);
+        #[allow(deprecated)]
+        let nonce = aes_gcm::aead::Nonce::<Aes256Gcm>::from_slice(&data[..12]);
         let ciphertext = &data[12..];
 
-        cipher
+        let plaintext = cipher
             .decrypt(nonce, ciphertext)
-            .map_err(|_| WalletError::DecryptionError("Decryption failed".to_string()))
+            .map_err(|_| WalletError::DecryptionError("Decryption failed".to_string()))?;
+
+        Ok(zeroize::Zeroizing::new(plaintext))
     }
 
     /// 鑾峰彇鎴栧垱寤哄瘑閽� (private helper)
-    fn get_or_create_key(&mut self, key_id: &str) -> Result<Vec<u8>, WalletError> {
+    fn get_or_create_key(&mut self, key_id: &str) -> Result<zeroize::Zeroizing<Vec<u8>>, WalletError> {
         if let Some(key) = self.keys.get(key_id) {
             Ok(key.clone())
         } else {
             let mut key = vec![0u8; 32];
             let mut rng = OsRng;
             rng.fill_bytes(&mut key);
-            self.keys.insert(key_id.to_string(), key.clone());
-            Ok(key)
+            let zk = zeroize::Zeroizing::new(key);
+            self.keys.insert(key_id.to_string(), zk.clone());
+            Ok(zk)
         }
     }
 
     /// 娲剧敓瀵嗛挜
-    pub fn derive_key(&self, password: &str, salt: &[u8]) -> Result<Vec<u8>, WalletError> {
+    pub fn derive_key(&self, password: &str, salt: &[u8]) -> Result<zeroize::Zeroizing<Vec<u8>>, WalletError> {
+        register_encryption_operation!("security_derive_key", EncryptionAlgorithm::Argon2, false);
         if salt.len() < 8 {
             return Err(WalletError::KeyDerivationError(
                 "Salt must be at least 8 bytes".to_string(),
@@ -85,7 +97,7 @@ impl WalletSecurity {
         Argon2::default()
             .hash_password_into(password.as_bytes(), salt, &mut key)
             .map_err(|_| WalletError::KeyDerivationError("Key derivation failed".to_string()))?;
-        Ok(key.to_vec())
+        Ok(zeroize::Zeroizing::new(key.to_vec()))
     }
 
     /// 瀹夊叏鎿﹂櫎鍐呭瓨
@@ -105,6 +117,11 @@ impl WalletSecurity {
         encryption_key: &[u8],
         aad: &[u8],
     ) -> Result<Vec<u8>, WalletError> {
+        register_encryption_operation!(
+            "security_encrypt_private_key",
+            EncryptionAlgorithm::Aes256Gcm,
+            false
+        );
         #[cfg(not(test))]
         if encryption_key.len() != 32 {
             return Err(WalletError::EncryptionError("Invalid encryption key length".to_string()));
@@ -116,7 +133,8 @@ impl WalletSecurity {
         let mut nonce_bytes = [0u8; 12];
         let mut rng = OsRng;
         rng.fill_bytes(&mut nonce_bytes);
-        let nonce = Nonce::from_slice(&nonce_bytes);
+        #[allow(deprecated)]
+        let nonce = aes_gcm::aead::Nonce::<Aes256Gcm>::from_slice(&nonce_bytes);
 
         let payload = Payload { msg: private_key, aad };
 
@@ -134,7 +152,12 @@ impl WalletSecurity {
         ciphertext: &[u8],
         encryption_key: &[u8],
         aad: &[u8],
-    ) -> Result<Vec<u8>, WalletError> {
+    ) -> Result<zeroize::Zeroizing<Vec<u8>>, WalletError> {
+        register_encryption_operation!(
+            "security_decrypt_private_key",
+            EncryptionAlgorithm::Aes256Gcm,
+            false
+        );
         if ciphertext.len() < 12 {
             return Err(WalletError::DecryptionError("Ciphertext too short".to_string()));
         }
@@ -147,14 +170,17 @@ impl WalletSecurity {
         let cipher = Aes256Gcm::new_from_slice(encryption_key)
             .map_err(|_| WalletError::DecryptionError("Invalid key length".to_string()))?;
 
-        let nonce = Nonce::from_slice(&ciphertext[..12]);
+        #[allow(deprecated)]
+        let nonce = aes_gcm::aead::Nonce::<Aes256Gcm>::from_slice(&ciphertext[..12]);
         let encrypted_data = &ciphertext[12..];
 
         let payload = Payload { msg: encrypted_data, aad };
 
-        cipher
+        let plaintext = cipher
             .decrypt(nonce, payload)
-            .map_err(|_| WalletError::DecryptionError("Private key decryption failed".to_string()))
+            .map_err(|_| WalletError::DecryptionError("Private key decryption failed".to_string()))?;
+
+        Ok(zeroize::Zeroizing::new(plaintext))
     }
 }
 
@@ -193,7 +219,7 @@ mod tests {
         let encrypted = security.encrypt(data, "test_key").unwrap();
         let decrypted = security.decrypt(&encrypted, "test_key").unwrap();
 
-        assert_eq!(data, decrypted.as_slice());
+    assert_eq!(data, decrypted.as_slice());
     }
 
     #[test]
@@ -204,7 +230,7 @@ mod tests {
         let key1 = security.derive_key("password", salt).unwrap();
         let key2 = security.derive_key("password", salt).unwrap();
 
-        assert_eq!(key1, key2);
+    assert_eq!(key1.as_slice(), key2.as_slice());
     }
 
     #[test]
@@ -213,7 +239,7 @@ mod tests {
         let plaintext = b"hello world";
         let ciphertext = security.encrypt(plaintext, "key1").unwrap();
         let decrypted = security.decrypt(&ciphertext, "key1").unwrap();
-        assert_eq!(decrypted, plaintext);
+    assert_eq!(decrypted.as_slice(), plaintext);
     }
 
     #[test]
@@ -243,7 +269,7 @@ mod tests {
         let data = b"Test data for encryption";
         let encrypted = security.encrypt(data, "test_key").unwrap();
         let decrypted = security.decrypt(&encrypted, "test_key").unwrap();
-        assert_eq!(data, decrypted.as_slice());
+    assert_eq!(data, decrypted.as_slice());
     }
 
     #[test]
@@ -252,7 +278,7 @@ mod tests {
         let data = b"";
         let encrypted = security.encrypt(data, "key").unwrap();
         let decrypted = security.decrypt(&encrypted, "key").unwrap();
-        assert_eq!(data, decrypted.as_slice());
+    assert_eq!(data, decrypted.as_slice());
     }
 
     #[test]

@@ -25,12 +25,17 @@ async fn setup_test_server() -> TestServer {
         },
         ..Default::default()
     };
-    let server = WalletServer::new("127.0.0.1".to_string(), 0, config, None).await.unwrap();
+    // Use deterministic test master key for consistent test results
+    let test_master_key = defi_hot_wallet::security::secret::vec_to_secret(vec![0u8; 32]); // 32 zero bytes for testing
+    let server =
+        WalletServer::new_for_test("127.0.0.1".to_string(), 0, config, None, Some(test_master_key))
+            .await
+            .unwrap();
     TestServer::new(server.create_router().await).unwrap()
 }
 
 /// Same as `setup_test_server` but allows providing an API key (Some) to exercise auth branches.
-async fn setup_test_server_with_key(api_key: Option<String>) -> TestServer {
+async fn setup_test_server_with_key(api_key: Option<zeroize::Zeroizing<Vec<u8>>>) -> TestServer {
     let config = WalletConfig {
         storage: StorageConfig {
             database_url: "sqlite::memory:".to_string(),
@@ -38,7 +43,17 @@ async fn setup_test_server_with_key(api_key: Option<String>) -> TestServer {
         },
         ..Default::default()
     };
-    let server = WalletServer::new("127.0.0.1".to_string(), 0, config, api_key).await.unwrap();
+    // Use deterministic test master key for consistent test results
+    let test_master_key = defi_hot_wallet::security::secret::vec_to_secret(vec![0u8; 32]); // 32 zero bytes for testing
+    let server = WalletServer::new_for_test(
+        "127.0.0.1".to_string(),
+        0,
+        config,
+        api_key,
+        Some(test_master_key),
+    )
+    .await
+    .unwrap();
     TestServer::new(server.create_router().await).unwrap()
 }
 
@@ -154,7 +169,7 @@ async fn test_bridge_wallet_lifecycle_and_success() {
 #[tokio::test(flavor = "current_thread")]
 async fn test_bridge_unauthorized_when_api_key_set() {
     // create server with an API key set -> requests without Authorization should 401
-    let server = setup_test_server_with_key(Some("secret-key".to_string())).await;
+    let server = setup_test_server_with_key(Some(zeroize::Zeroizing::new("secret-key".as_bytes().to_vec()))).await;
 
     let req = BridgeAssetsRequest {
         from_wallet: "any".to_string(),

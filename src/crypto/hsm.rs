@@ -1,17 +1,32 @@
 // src/crypto/hsm.rs
 use anyhow::Result;
 use chrono::{DateTime, Utc};
+use rand::{rngs::OsRng, RngCore};
+use secp256k1::{Message, Secp256k1, SecretKey};
+use sha2::{Digest, Sha256};
+use crate::crypto::signature_utils::ensure_low_s;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 use tracing::{debug, info, warn};
-use zeroize::{Zeroize, ZeroizeOnDrop};
+use zeroize::{Zeroize, ZeroizeOnDrop, Zeroizing};
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct HSMConfig {
     pub enabled: bool,
     pub device_path: String,
-    pub pin: String,
+    pub pin: Zeroizing<String>,
     pub isolation_enabled: bool,
+}
+
+impl core::fmt::Debug for HSMConfig {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("HSMConfig")
+            .field("enabled", &self.enabled)
+            .field("device_path", &self.device_path)
+            .field("pin", &"[REDACTED]")
+            .field("isolation_enabled", &self.isolation_enabled)
+            .finish()
+    }
 }
 
 #[derive(Debug, Zeroize, ZeroizeOnDrop)]
@@ -37,7 +52,7 @@ impl HSMManager {
         let config = HSMConfig {
             enabled: false, // Disabled by default for demo
             device_path: "/dev/hsm0".to_string(),
-            pin: "".to_string(),
+            pin: Zeroizing::new("".to_string()),
             isolation_enabled: true,
         };
 
@@ -106,7 +121,7 @@ impl HSMManager {
         Ok(())
     }
 
-    pub async fn read_secure_memory(&self, region_id: u64) -> Result<Vec<u8>> {
+    pub async fn read_secure_memory(&self, region_id: u64) -> Result<Zeroizing<Vec<u8>>> {
         debug!("Reading from secure memory region {}", region_id);
 
         let regions = self.secure_regions.lock().await;
@@ -114,7 +129,7 @@ impl HSMManager {
             .get(&region_id)
             .ok_or_else(|| anyhow::anyhow!("Secure memory region not found: {}", region_id))?;
 
-        Ok(region.data.clone())
+        Ok(Zeroizing::new(region.data.clone()))
     }
 
     pub async fn free_secure_memory(&self, region_id: u64) -> Result<()> {
@@ -139,10 +154,10 @@ impl HSMManager {
             return Err(anyhow::anyhow!("HSM not initialized"));
         }
 
-        use rand::RngCore;
+        // Use cryptographically secure RNG instead of thread_rng
         let region_id = self.allocate_secure_memory(key_size).await?;
         let mut buf = vec![0u8; key_size];
-        rand::thread_rng().fill_bytes(&mut buf);
+        OsRng.fill_bytes(&mut buf);
         self.write_secure_memory(region_id, &buf).await?;
         buf.zeroize();
 
@@ -157,19 +172,51 @@ impl HSMManager {
             return Err(anyhow::anyhow!("HSM not initialized"));
         }
 
-        // Read the private key from secure memory
-        let private_key = self.read_secure_memory(key_region_id).await?;
+        // Read the private key from secure memory (Zeroizing<Vec<u8>>)
+        let private_key_bytes = self.read_secure_memory(key_region_id).await?;
 
-        // In a real HSM, signing would happen within the secure hardware
-        // For this demo, we'll use a hash-based signature
-        use sha2::{Digest, Sha256};
+        // Ensure we have a valid 32-byte private key
+        if private_key_bytes.len() != 32 {
+            return Err(anyhow::anyhow!(
+                "Invalid private key length: expected 32 bytes, got {}",
+                private_key_bytes.len()
+            ));
+        }
+        // Create secp256k1 context and key. Extract bytes into a small array and then
+        // ensure the Zeroizing buffer is dropped/zeroized as soon as possible.
+        let secp = Secp256k1::new();
+        let mut priv_arr = [0u8; 32];
+        priv_arr.copy_from_slice(&private_key_bytes[..32]);
+
+        // Drop/zeroize the Zeroizing<Vec<u8>> before constructing SecretKey
+        drop(private_key_bytes);
+
+        let secret_key = SecretKey::from_slice(&priv_arr)
+            .map_err(|e| anyhow::anyhow!("Invalid private key: {}", e))?;
+
+        // Zeroize the stack copy of priv_arr after SecretKey created
+        priv_arr.zeroize();
+
+        let keypair = secp256k1::KeyPair::from_secret_key(&secp, &secret_key);
+
+        // Hash the message with domain separation using SHA256
         let mut hasher = Sha256::new();
-        hasher.update(&private_key);
+        hasher.update(b"HSM_SIG_V1\x00");
         hasher.update(message);
-        let signature = hasher.finalize().to_vec();
+        let message_hash = hasher.finalize();
+        let message_obj = Message::from_slice(&message_hash)
+            .map_err(|e| anyhow::anyhow!("Invalid message hash: {}", e))?;
 
-        debug!("Message signed with secure key");
-        Ok(signature)
+    // Sign the message
+    let signature = secp.sign_ecdsa(&message_obj, &keypair.secret_key());
+
+    // Normalize to low-S to prevent malleability and ensure canonicality
+    let mut compact = [0u8; 64];
+    compact.copy_from_slice(&signature.serialize_compact());
+    let normalized = ensure_low_s(&compact);
+
+    debug!("Message signed with secure ECDSA key (low-S normalized)");
+    Ok(normalized.to_vec())
     }
 
     pub async fn get_memory_stats(&self) -> Result<HSMMemoryStats> {
@@ -220,7 +267,7 @@ mod tests {
         let config = HSMConfig {
             enabled: false,
             device_path: "/dev/null".to_string(),
-            pin: "test".to_string(),
+            pin: Zeroizing::new("test".to_string()),
             isolation_enabled: true,
         };
 
@@ -247,13 +294,45 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_hsm_debug_pin_redacted() {
+        let cfg = HSMConfig {
+            enabled: true,
+            device_path: "/dev/hsm0".to_string(),
+            pin: Zeroizing::new("supersecret".to_string()),
+            isolation_enabled: true,
+        };
+        let dbg = format!("{:?}", cfg);
+        assert!(dbg.contains("[REDACTED]"));
+        assert!(!dbg.contains("supersecret"));
+    }
+
+    #[tokio::test]
+    async fn test_read_secure_memory_zeroizing_type() {
+        let mut hsm = HSMManager::new().await.unwrap();
+        let config = HSMConfig {
+            enabled: false,
+            device_path: "/dev/null".to_string(),
+            pin: Zeroizing::new("test".to_string()),
+            isolation_enabled: true,
+        };
+        hsm.initialize(config).await.unwrap();
+        let region_id = hsm.allocate_secure_memory(4).await.unwrap();
+        hsm.write_secure_memory(region_id, &[1, 2, 3, 4]).await.unwrap();
+        let data = hsm.read_secure_memory(region_id).await.unwrap();
+        assert_eq!(&*data, &[1, 2, 3, 4]);
+        // Drop occurs here; Zeroizing ensures buffer cleared on drop (not observable here, but type-level guarantee)
+        drop(data);
+        hsm.free_secure_memory(region_id).await.unwrap();
+    }
+
+    #[tokio::test]
     async fn test_secure_key_generation() {
         let mut hsm = HSMManager::new().await.unwrap();
 
         let config = HSMConfig {
             enabled: false,
             device_path: "/dev/null".to_string(),
-            pin: "test".to_string(),
+            pin: Zeroizing::new("test".to_string()),
             isolation_enabled: true,
         };
 
@@ -266,7 +345,12 @@ mod tests {
         // Sign with the key
         let message = b"test message";
         let signature = hsm.secure_sign(key_id, message).await.unwrap();
-        assert!(!signature.is_empty());
+
+        // Verify signature is proper ECDSA format (64 bytes compact)
+        assert_eq!(signature.len(), 64, "ECDSA signature should be 64 bytes compact");
+
+        // Verify signature is not just a hash (32 bytes)
+        assert_ne!(signature.len(), 32, "Signature should not be just a hash");
 
         // Clean up
         hsm.free_secure_memory(key_id).await.unwrap();

@@ -24,13 +24,24 @@ fn create_test_config() -> WalletConfig {
         },
         quantum_safe: false,
         multi_sig_threshold: 2,
+        derivation: Default::default(),
     }
 }
 
 async fn create_test_server() -> TestServer {
     let config = create_test_config();
-    let api_key = Some("test_api_key".to_string());
-    let server = WalletServer::new("127.0.0.1".to_string(), 0, config, api_key).await.unwrap();
+    let api_key = Some(zeroize::Zeroizing::new("test_api_key".as_bytes().to_vec()));
+    // Use deterministic test master key for consistent test results
+    let test_master_key = defi_hot_wallet::security::secret::vec_to_secret(vec![0u8; 32]); // 32 zero bytes for testing
+    let server = WalletServer::new_for_test(
+        "127.0.0.1".to_string(),
+        0,
+        config,
+        api_key,
+        Some(test_master_key),
+    )
+    .await
+    .unwrap();
     TestServer::new(server.create_router().await).unwrap()
 }
 
@@ -211,7 +222,7 @@ async fn test_get_balance_branches() {
         .await;
     assert_eq!(r2.status_code(), StatusCode::BAD_REQUEST);
     let e: Value = r2.json();
-    assert_eq!(e["error"], "Invalid parameters");
+    assert_eq!(e["error"], "Network parameter is required");
 
     // wallet not found
     let r3 = server
@@ -258,35 +269,35 @@ async fn send_transaction_branches() {
     let r = server.post("/api/wallets/x/send").json(&payload).await;
     assert_eq!(r.status_code(), StatusCode::UNAUTHORIZED);
 
-    // invalid params empty fields
+    // invalid params empty fields - but wallet doesn't exist, so wallet not found first
     let r2 = server
         .post("/api/wallets/x/send")
         .json(&json!({"to_address":"","amount":"","network":""}))
         .add_header("Authorization", "test_api_key")
         .await;
-    assert_eq!(r2.status_code(), StatusCode::BAD_REQUEST);
+    assert_eq!(r2.status_code(), StatusCode::NOT_FOUND);
     let e: Value = r2.json();
-    assert_eq!(e["error"], "Invalid parameters");
+    assert_eq!(e["error"], "Wallet not found");
 
-    // invalid address format for eth
+    // invalid address format for eth - but wallet doesn't exist, so wallet not found first
     let r3 = server
         .post("/api/wallets/x/send")
         .json(&json!({"to_address":"123","amount":"1","network":"eth"}))
         .add_header("Authorization", "test_api_key")
         .await;
-    assert_eq!(r3.status_code(), StatusCode::BAD_REQUEST);
+    assert_eq!(r3.status_code(), StatusCode::NOT_FOUND);
     let e3: Value = r3.json();
-    assert_eq!(e3["error"], "Invalid address format");
+    assert_eq!(e3["error"], "Wallet not found");
 
-    // invalid amount
+    // invalid amount - but wallet doesn't exist, so wallet not found first
     let r4 = server
         .post("/api/wallets/x/send")
         .json(&json!({"to_address":"0xabc","amount":"-1","network":"eth"}))
         .add_header("Authorization", "test_api_key")
         .await;
-    assert_eq!(r4.status_code(), StatusCode::BAD_REQUEST);
+    assert_eq!(r4.status_code(), StatusCode::NOT_FOUND);
     let e4: Value = r4.json();
-    assert_eq!(e4["error"], "Invalid amount");
+    assert_eq!(e4["error"], "Wallet not found");
 
     // wallet not found
     let r5 = server
@@ -352,7 +363,9 @@ async fn history_and_backup_and_restore_branches() {
         .await;
     assert_eq!(r5.status_code(), StatusCode::OK);
     let b: Value = r5.json();
-    assert!(!b["seed_phrase"].as_str().unwrap_or("").is_empty());
+    // In test mode backup returns structured response with plaintext in `ciphertext`
+    assert!(b["ciphertext"].is_string());
+    assert_eq!(b["alg"], "PLAINTEXT");
 
     // restore
     let payload = json!({ "name": format!("rest_{}", Uuid::new_v4().simple()), "seed_phrase": "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about" });
@@ -374,7 +387,8 @@ async fn test_backup_wallet() {
         .await;
     assert_eq!(response.status_code(), StatusCode::OK);
     let body: serde_json::Value = response.json();
-    assert!(body["seed_phrase"].is_string());
+    assert!(body["ciphertext"].is_string());
+    assert_eq!(body["alg"], "PLAINTEXT");
 }
 
 #[tokio::test]
@@ -433,15 +447,16 @@ async fn multi_sig_branches() {
     let e: Value = r.json();
     assert_eq!(e["error"], "Insufficient signatures");
 
-    // sufficient signatures -> either OK or 500 depending on wallet_manager
+    // sufficient signatures -> should fail on invalid address
     let payload2 = json!({ "to_address": "0xabc", "amount": "1.0", "network": "eth", "signatures": ["sig1","sig2"] });
     let r2 = server
         .post(&format!("/api/wallets/{}/send_multi_sig", name))
         .json(&payload2)
         .add_header("Authorization", "test_api_key")
         .await;
-    let code = r2.status_code();
-    assert!(code == StatusCode::OK || code == StatusCode::INTERNAL_SERVER_ERROR);
+    assert_eq!(r2.status_code(), StatusCode::BAD_REQUEST);
+    let e2: Value = r2.json();
+    assert_eq!(e2["error"], "Invalid address: Invalid Ethereum address format");
 }
 
 #[tokio::test]

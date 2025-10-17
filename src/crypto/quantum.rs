@@ -1,19 +1,20 @@
 // src/crypto/quantum.rs
 use aes_gcm::{
     aead::{Aead, KeyInit},
-    Aes256Gcm, Key, Nonce,
+    Aes256Gcm,
 };
 use anyhow::Result;
 use rand::RngCore;
 use serde::{Deserialize, Serialize};
-use sha2::{Digest, Sha256};
 use tracing::{debug, info};
 use zeroize::{Zeroize, ZeroizeOnDrop};
+
+use crate::crypto::encryption_consistency::EncryptionAlgorithm;
+use crate::register_encryption_operation;
 
 const KYBER_CIPHERTEXT_LEN: usize = 1568;
 const KYBER_SECRET_LEN: usize = 3168;
 const AES_NONCE_LEN: usize = 12;
-const SHARED_SECRET: &[u8] = b"simulated_shared_secret";
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct QuantumKeyPair {
@@ -41,8 +42,8 @@ impl QuantumSafeEncryption {
         let mut public_key = vec![0u8; KYBER_CIPHERTEXT_LEN];
         let mut secret_key = vec![0u8; KYBER_SECRET_LEN];
 
-        rand::thread_rng().fill_bytes(&mut public_key);
-        rand::thread_rng().fill_bytes(&mut secret_key);
+        rand::rngs::OsRng.fill_bytes(&mut public_key);
+        rand::rngs::OsRng.fill_bytes(&mut secret_key);
 
         let keypair = QuantumKeyPair { public_key, secret_key };
 
@@ -52,17 +53,24 @@ impl QuantumSafeEncryption {
         Ok(keypair)
     }
 
-    pub fn encrypt(&self, plaintext: &[u8]) -> Result<Vec<u8>> {
+    pub fn encrypt(&self, plaintext: &[u8], master_key: &[u8]) -> Result<zeroize::Zeroizing<Vec<u8>>> {
+        register_encryption_operation!("quantum_encrypt", EncryptionAlgorithm::QuantumSafe, true);
         debug!("Encrypting data with quantum-safe encryption (simulated)");
 
-        // Derive AES key (simulated) from a shared secret
-        let aes_key = Sha256::digest(SHARED_SECRET);
-        let cipher = Aes256Gcm::new(Key::<Aes256Gcm>::from_slice(&aes_key));
+        // Derive AES key from master key using HKDF
+        let mut aes_key_bytes = [0u8; 32];
+        let hkdf = hkdf::Hkdf::<sha2::Sha256>::new(Some(b"quantum-enc-salt"), master_key);
+        hkdf.expand(b"aes-gcm-key", &mut aes_key_bytes)
+            .map_err(|e| anyhow::anyhow!("Failed to derive encryption key: {}", e))?;
+        let aes_key = aes_key_bytes;
+        let cipher = Aes256Gcm::new_from_slice(&aes_key)
+            .map_err(|e| anyhow::anyhow!("Failed to init AES cipher: {}", e))?;
 
         // Generate nonce
         let mut nonce_bytes = [0u8; AES_NONCE_LEN];
-        rand::thread_rng().fill_bytes(&mut nonce_bytes);
-        let nonce = Nonce::from_slice(&nonce_bytes);
+        rand::rngs::OsRng.fill_bytes(&mut nonce_bytes);
+        #[allow(deprecated)]
+        let nonce = aes_gcm::aead::Nonce::<Aes256Gcm>::from_slice(&nonce_bytes);
 
         // AES-GCM encrypt
         let ciphertext = cipher
@@ -71,7 +79,7 @@ impl QuantumSafeEncryption {
 
         // Simulated KEM ciphertext (Kyber)
         let mut simulated_kyber_ciphertext = vec![0u8; KYBER_CIPHERTEXT_LEN];
-        rand::thread_rng().fill_bytes(&mut simulated_kyber_ciphertext);
+        rand::rngs::OsRng.fill_bytes(&mut simulated_kyber_ciphertext);
 
         // Format: [4 bytes len][kyber_ct][12 bytes nonce][aes_ct]
         let mut result = Vec::with_capacity(
@@ -85,12 +93,14 @@ impl QuantumSafeEncryption {
         // Zeroize sensitive temporary buffers where possible
         nonce_bytes.zeroize();
         simulated_kyber_ciphertext.zeroize();
+        aes_key_bytes.zeroize();
 
         debug!("Data encrypted with quantum-safe encryption (simulated)");
-        Ok(result)
+        Ok(zeroize::Zeroizing::new(result))
     }
 
-    pub fn decrypt(&self, encrypted_data: &[u8]) -> Result<Vec<u8>> {
+    pub fn decrypt(&self, encrypted_data: &[u8], master_key: &[u8]) -> Result<zeroize::Zeroizing<Vec<u8>>> {
+        register_encryption_operation!("quantum_decrypt", EncryptionAlgorithm::QuantumSafe, true);
         debug!("Decrypting data with quantum-safe encryption (simulated)");
 
         if encrypted_data.len() < 4 {
@@ -114,18 +124,28 @@ impl QuantumSafeEncryption {
         let nonce_bytes = &encrypted_data[nonce_start..nonce_end];
         let aes_ciphertext = &encrypted_data[nonce_end..];
 
-        // Derive AES key (simulated) from the shared secret
-        let aes_key = Sha256::digest(SHARED_SECRET);
+        // Derive AES key from master key using HKDF
+        let mut aes_key_bytes = [0u8; 32];
+        let hkdf = hkdf::Hkdf::<sha2::Sha256>::new(Some(b"quantum-enc-salt"), master_key);
+        hkdf.expand(b"aes-gcm-key", &mut aes_key_bytes)
+            .map_err(|e| anyhow::anyhow!("Failed to derive decryption key: {}", e))?;
+        let aes_key = aes_key_bytes;
 
-        let cipher = Aes256Gcm::new(Key::<Aes256Gcm>::from_slice(&aes_key));
-        let nonce = Nonce::from_slice(nonce_bytes);
+        let cipher = Aes256Gcm::new_from_slice(&aes_key)
+            .map_err(|e| anyhow::anyhow!("Failed to init AES cipher: {}", e))?;
+        #[allow(deprecated)]
+        let nonce = aes_gcm::aead::Nonce::<Aes256Gcm>::from_slice(nonce_bytes);
 
         let plaintext = cipher
             .decrypt(nonce, aes_ciphertext)
             .map_err(|e| anyhow::anyhow!("AES decryption failed: {e}"))?;
 
+        // Zeroize sensitive temporary buffers
+        aes_key_bytes.zeroize();
+
         debug!("Data decrypted with quantum-safe encryption (simulated)");
-        Ok(plaintext)
+        // Return as zeroizing buffer so callers don't hold plaintext Vec<u8>
+        Ok(zeroize::Zeroizing::new(plaintext))
     }
 
     pub fn get_public_key(&self) -> Option<&[u8]> {
@@ -156,10 +176,11 @@ mod tests {
     #[test]
     fn test_quantum_safe_encryption() {
         let crypto = QuantumSafeEncryption::new().unwrap();
+        let master_key = b"test_master_key_32_bytes_long!!!";
 
         let plaintext = b"Hello, quantum-safe world!";
-        let encrypted = crypto.encrypt(plaintext).unwrap();
-        let decrypted = crypto.decrypt(&encrypted).unwrap();
+        let encrypted = crypto.encrypt(plaintext, master_key).unwrap();
+        let decrypted = crypto.decrypt(&encrypted, master_key).unwrap();
 
         assert_eq!(plaintext, decrypted.as_slice());
     }

@@ -10,6 +10,7 @@ use ethers::providers::{MockProvider, MockResponse, Provider};
 use ethers::types::U256;
 use std::str::FromStr;
 use serde_json::json;
+use hex::encode;
 
 // Helper function to create a mock provider with a provider
 fn create_mock_client() -> EthereumClient<MockProvider> {
@@ -385,7 +386,7 @@ async fn test_send_transaction_normal() {
     let mock_provider = MockProvider::new();
     let tx_hash = H256::from_str("0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef").unwrap();
 
-    mock_provider.push_response(MockResponse::Value(json!(format!("{:?}", tx_hash)))); // send_transaction
+    mock_provider.push_response(MockResponse::Value(json!(format!("0x{}", encode(tx_hash.as_bytes()))))); // send_transaction
     mock_provider.push_response(MockResponse::Value(json!(U256::from(42)))); // nonce
     mock_provider.push_response(MockResponse::Value(json!(U256::from(20_000_000_000u64)))); // gas_price
 
@@ -393,11 +394,12 @@ async fn test_send_transaction_normal() {
     let client = EthereumClient::new_with_provider(provider);
 
     let private_key = [1u8; 32];
+    let pk = crate::core::domain::PrivateKey::try_from_slice(&private_key).expect("valid pk");
     let to_address = "0x742d35Cc6634C0532925a3b844Bc454e4438f44e";
     let amount = "0.01";
 
-    let result_tx_hash = client.send_transaction(&private_key, to_address, amount).await.unwrap();
-    assert_eq!(result_tx_hash, format!("{:?}", tx_hash));
+    let result_tx_hash = client.send_transaction(&pk, to_address, amount).await.unwrap();
+    assert_eq!(result_tx_hash, format!("0x{}", encode(tx_hash.as_bytes())));
 }
 
 #[tokio::test]
@@ -405,7 +407,7 @@ async fn test_send_transaction_zero_amount() {
     let mock_provider = MockProvider::new();
     let tx_hash = H256::from_str("0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef").unwrap();
 
-    mock_provider.push_response(MockResponse::Value(json!(format!("{:?}", tx_hash))));
+    mock_provider.push_response(MockResponse::Value(json!(format!("0x{}", encode(tx_hash.as_bytes())))));
     mock_provider.push_response(MockResponse::Value(json!(U256::from(42))));
     mock_provider.push_response(MockResponse::Value(json!(U256::from(20_000_000_000u64))));
 
@@ -413,11 +415,12 @@ async fn test_send_transaction_zero_amount() {
     let client = EthereumClient::new_with_provider(provider);
 
     let private_key = [1u8; 32];
+    let pk = crate::core::domain::PrivateKey::try_from_slice(&private_key).expect("valid pk");
     let to_address = "0x742d35Cc6634C0532925a3b844Bc454e4438f44e";
     let amount = "0.0"; // Zero amount
 
-    let result_tx_hash = client.send_transaction(&private_key, to_address, amount).await.unwrap();
-    assert_eq!(result_tx_hash, format!("{:?}", tx_hash));
+    let result_tx_hash = client.send_transaction(&pk, to_address, amount).await.unwrap();
+    assert_eq!(result_tx_hash, format!("0x{}", encode(tx_hash.as_bytes())));
 }
 
 #[tokio::test]
@@ -425,7 +428,7 @@ async fn test_send_transaction_max_amount() {
     let mock_provider = MockProvider::new();
     let tx_hash = H256::from_str("0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef").unwrap();
 
-    mock_provider.push_response(MockResponse::Value(json!(format!("{:?}", tx_hash))));
+    mock_provider.push_response(MockResponse::Value(json!(format!("0x{}", encode(tx_hash.as_bytes())))));
     mock_provider.push_response(MockResponse::Value(json!(U256::from(42))));
     mock_provider.push_response(MockResponse::Value(json!(U256::from(20_000_000_000u64))));
 
@@ -433,11 +436,12 @@ async fn test_send_transaction_max_amount() {
     let client = EthereumClient::new_with_provider(provider);
 
     let private_key = [1u8; 32];
+    let pk = crate::core::domain::PrivateKey::try_from_slice(&private_key).expect("valid pk");
     let to_address = "0x742d35Cc6634C0532925a3b844Bc454e4438f44e";
     let amount = "115792089237316195423570985008687907853269984665640564039457584007913129639935"; // Max U256 as string
 
-    let result_tx_hash = client.send_transaction(&private_key, to_address, amount).await.unwrap();
-    assert_eq!(result_tx_hash, format!("{:?}", tx_hash));
+    let result_tx_hash = client.send_transaction(&pk, to_address, amount).await.unwrap();
+    assert_eq!(result_tx_hash, format!("0x{}", encode(tx_hash.as_bytes())));
 }
 
 #[tokio::test]
@@ -445,7 +449,7 @@ async fn test_send_transaction_duplicate_tx() {
     let mock_provider = MockProvider::new();
     let tx_hash = H256::from_str("0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef").unwrap();
 
-    mock_provider.push_response(MockResponse::Value(json!(format!("{:?}", tx_hash))));
+    mock_provider.push_response(MockResponse::Value(json!(format!("0x{}", encode(tx_hash.as_bytes())))));
     mock_provider.push_response(MockResponse::Value(json!(U256::from(42))));
     mock_provider.push_response(MockResponse::Value(json!(U256::from(20_000_000_000u64))));
 
@@ -453,12 +457,13 @@ async fn test_send_transaction_duplicate_tx() {
     let client = EthereumClient::new_with_provider(provider);
 
     let private_key = [1u8; 32];
+    let pk = crate::core::domain::PrivateKey::try_from_slice(&private_key).expect("valid pk");
     let to_address = "0x742d35Cc6634C0532925a3b844Bc454e4438f44e";
     let amount = "0.01";
 
     // Send twice (simulate duplicate)
-    let result1 = client.send_transaction(&private_key, to_address, amount).await.unwrap();
-    let result2 = client.send_transaction(&private_key, to_address, amount).await.unwrap();
+    let result1 = client.send_transaction(&pk, to_address, amount).await.unwrap();
+    let result2 = client.send_transaction(&pk, to_address, amount).await.unwrap();
     assert_eq!(result1, result2); // Same hash
 }
 
@@ -470,8 +475,9 @@ async fn test_send_transaction_invalid_private_key_length() {
     let to_address = "0x742d35Cc6634C0532925a3b844Bc454e4438f44e";
     let amount = "0.01";
 
-    let result = client.send_transaction(&private_key, to_address, amount).await;
-    assert!(result.is_err());
+    // Construction of PrivateKey should fail for invalid length
+    let try_pk = crate::core::domain::PrivateKey::try_from_slice(&private_key);
+    assert!(try_pk.is_err());
 }
 
 #[tokio::test]
@@ -479,10 +485,11 @@ async fn test_send_transaction_invalid_to_address() {
     let client = create_mock_client();
 
     let private_key = [1u8; 32];
+    let pk = crate::core::domain::PrivateKey::try_from_slice(&private_key).expect("valid pk");
     let to_address = "invalid";
     let amount = "0.01";
 
-    let result = client.send_transaction(&private_key, to_address, amount).await;
+    let result = client.send_transaction(&pk, to_address, amount).await;
     assert!(result.is_err());
 }
 
@@ -491,10 +498,11 @@ async fn test_send_transaction_invalid_amount() {
     let client = create_mock_client();
 
     let private_key = [1u8; 32];
+    let pk = crate::core::domain::PrivateKey::try_from_slice(&private_key).expect("valid pk");
     let to_address = "0x742d35Cc6634C0532925a3b844Bc454e4438f44e";
     let amount = "invalid";
 
-    let result = client.send_transaction(&private_key, to_address, amount).await;
+    let result = client.send_transaction(&pk, to_address, amount).await;
     assert!(result.is_err());
 }
 
@@ -503,10 +511,11 @@ async fn test_send_transaction_empty_private_key() {
     let client = create_mock_client();
 
     let private_key = [0u8; 32]; // All zeros
+    let pk = crate::core::domain::PrivateKey::try_from_slice(&private_key).expect("valid pk");
     let to_address = "0x742d35Cc6634C0532925a3b844Bc454e4438f44e";
     let amount = "0.01";
 
-    let result = client.send_transaction(&private_key, to_address, amount).await;
+    let result = client.send_transaction(&pk, to_address, amount).await;
     assert!(result.is_err()); // Should fail due to invalid private key
 }
 
@@ -572,7 +581,7 @@ async fn test_send_transaction_same_address() {
     let mock_provider = MockProvider::new();
     let tx_hash = H256::from_str("0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef").unwrap();
 
-    mock_provider.push_response(MockResponse::Value(json!(format!("{:?}", tx_hash))));
+    mock_provider.push_response(MockResponse::Value(json!(format!("0x{}", encode(tx_hash.as_bytes())))));
     mock_provider.push_response(MockResponse::Value(json!(U256::from(42))));
     mock_provider.push_response(MockResponse::Value(json!(U256::from(20_000_000_000u64))));
 
@@ -580,11 +589,12 @@ async fn test_send_transaction_same_address() {
     let client = EthereumClient::new_with_provider(provider);
 
     let private_key = [1u8; 32];
+    let pk = crate::core::domain::PrivateKey::try_from_slice(&private_key).expect("valid pk");
     let to_address = "0x742d35Cc6634C0532925a3b844Bc454e4438f44e"; // Same as from (derived from private key)
     let amount = "0.01";
 
     // This might succeed or fail depending on implementation; for coverage, call it
-    let result = client.send_transaction(&private_key, to_address, amount).await;
+    let result = client.send_transaction(&pk, to_address, amount).await;
     // Assuming it succeeds in mock
     assert!(result.is_ok());
 }
@@ -614,9 +624,10 @@ async fn test_send_transaction_negative_amount() {
     let client = create_mock_client();
 
     let private_key = [1u8; 32];
+    let pk = crate::core::domain::PrivateKey::try_from_slice(&private_key).expect("valid pk");
     let to_address = "0x742d35Cc6634C0532925a3b844Bc454e4438f44e";
     let amount = "-0.01";
 
-    let result = client.send_transaction(&private_key, to_address, amount).await;
+    let result = client.send_transaction(&pk, to_address, amount).await;
     assert!(result.is_err());
 }

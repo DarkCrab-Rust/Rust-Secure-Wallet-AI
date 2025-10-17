@@ -9,14 +9,11 @@ on:
     branches: [ main ]
 
 env:
-  # Prefer a secret for real key; CI step can generate a deterministic key if needed.
-  WALLET_ENC_KEY: "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
-  TEST_SKIP_DECRYPT: "1"
-  BRIDGE_MOCK_FORCE_SUCCESS: "1"
-  BRIDGE_MOCK: "1"
+  # Do NOT set insecure placeholders here. Use the `test-env` feature or secrets
+  # to provide any deterministic keys during CI. Keeping plaintext test keys in
+  # workflows is insecure and may leak into logs/artifacts.
   CARGO_TERM_COLOR: always
   CARGO_TARGET_DIR: "defi-target"
-  # Must be online to fetch crates like k256 in patched subcrates
   CARGO_NET_OFFLINE: "false"
   DATABASE_URL: sqlite://./wallets.db
   
@@ -40,61 +37,39 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y pkg-config libssl-dev build-essential ca-certificates curl nasm
 
-      - name: Ensure a deterministic WALLET_ENC_KEY and test envs
+      - name: Prepare test envs (feature-gated)
         shell: bash
         run: |
-          # Generate base64 32-byte zero key (portable)
-          WALLET_KEY=$(awk 'BEGIN{for(i=0;i<32;i++) printf "\x00"}' | base64 -w0)
-          echo "WALLET_ENC_KEY=${WALLET_KEY}" >> $GITHUB_ENV
-          echo "TEST_SKIP_DECRYPT=1" >> $GITHUB_ENV
-          echo "BRIDGE_MOCK_FORCE_SUCCESS=1" >> $GITHUB_ENV
-          echo "BRIDGE_MOCK=1" >> $GITHUB_ENV
-          # also export to current shell for immediate use
-          export WALLET_ENC_KEY="${WALLET_KEY}"
-          export TEST_SKIP_DECRYPT=1
-          export BRIDGE_MOCK_FORCE_SUCCESS=1
-          export BRIDGE_MOCK=1
+          # Tests that require a deterministic environment should run with
+          # `--features test-env` and not rely on plaintext keys committed
+          # into the workflow file. If secrets are required, use repository
+          # secrets and inject them via proper workflow inputs (do not commit them).
+          echo "NOTE: Running tests; use --features test-env when deterministic envs are needed"
 
-      - name: Create small test setup file to set envs at test runtime
-        run: |
-          mkdir -p tests
-          cat > tests/test_setup.rs <<'RUST'
-          use base64::engine::general_purpose::STANDARD;
-          use base64::Engine as _;
-          use ctor::ctor;
-          use std::env;
-          #[ctor]
-          fn test_setup() {
-              // Ensure envs used by tests are present in runner (fallback if not in GITHUB_ENV)
-              env::set_var("TEST_SKIP_DECRYPT", env::var("TEST_SKIP_DECRYPT").unwrap_or_else(|_| "1".into()));
-              env::set_var("BRIDGE_MOCK_FORCE_SUCCESS", env::var("BRIDGE_MOCK_FORCE_SUCCESS").unwrap_or_else(|_| "1".into()));
-              // If WALLET_ENC_KEY not present, create a valid base64 32-byte key
-              let key = env::var("WALLET_ENC_KEY").unwrap_or_else(|_| {
-                  let raw = vec![0u8; 32];
-                  STANDARD.encode(&raw)
-              });
-              env::set_var("WALLET_ENC_KEY", key);
-              eprintln!("test_setup: envs prepared");
-          }
-          RUST
+      # The test setup file that programmatically injects WALLET_ENC_KEY and other
+      # test defaults was removed to prevent insecure defaults from being
+      # constructed inside CI. Tests that require deterministic environments
+      # should run with `--features test-env` or be provided secrets via the
+      # repository's Secrets configuration.
 
       - name: Format check (non-fatal)
         run: cargo fmt --all -- --check || true
 
       - name: Run full test suite (allow warnings)
         run: |
-          # Run workspace tests; do not fail on warnings because RUSTFLAGS allows them
+          # Run workspace tests feature-gated. Do NOT enable --all-features here
+          # because some features may toggle insecure test defaults. Use the
+          # `test-env` feature when deterministic test values are required.
           export BRIDGE_MOCK_FORCE_SUCCESS=1
           export BRIDGE_MOCK=1
-          # Enable test-env feature to run src/test_env.rs ctor initializer
-          cargo test --workspace --jobs 2 --features test-env --all-features
+          cargo test --workspace --jobs 2 --features test-env
 
       - name: Re-run the previously failing test with logs
         run: |
           # run the specific test file to gather logs and ensure the error reproduces (if present)
           export BRIDGE_MOCK_FORCE_SUCCESS=1
           export BRIDGE_MOCK=1
-          cargo test --test api_handlers_tests --features test-env --all-features -- --nocapture || true
+          cargo test --test api_handlers_tests --features test-env -- --nocapture || true
 
       - name: Upload test logs (if any)
         if: failure()

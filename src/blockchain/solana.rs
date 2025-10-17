@@ -68,13 +68,17 @@ impl BlockchainClient for SolanaClient {
 
     async fn send_transaction(
         &self,
-        private_key: &[u8],
+        private_key: &crate::core::domain::PrivateKey,
         to: &str,
         amount: &str,
     ) -> Result<String, WalletError> {
         info!("💸 Sending {} SOL to {} (simulated)", amount, to);
 
-        if private_key.len() != 32 {
+        let mut pk_len_ok = false;
+        private_key.with_secret(|pk_bytes| {
+            pk_len_ok = pk_bytes.len() == 32;
+        });
+        if !pk_len_ok {
             return Err(WalletError::KeyDerivationError(
                 "Private key must be 32 bytes for Solana".to_string(),
             ));
@@ -84,10 +88,9 @@ impl BlockchainClient for SolanaClient {
             return Err(WalletError::AddressError(format!("Invalid recipient address: {}", to)));
         }
 
-        // Parse amount
-        let _amount_f64: f64 = amount
-            .parse()
-            .map_err(|e| WalletError::ValidationError(format!("Invalid amount: {}", e)))?;
+        // Validate amount strictly to avoid float precision issues
+        crate::core::validation::validate_amount_strict(amount, 9)
+            .map_err(|_| WalletError::ValidationError("Invalid amount".to_string()))?;
 
         // Simulated transaction hash
         let tx_hash = format!("simulated_solana_tx_{}", chrono::Utc::now().timestamp());
@@ -122,6 +125,13 @@ impl BlockchainClient for SolanaClient {
 
     async fn get_block_number(&self) -> Result<u64, WalletError> {
         // Simulate current slot number
+        let slot = chrono::Utc::now().timestamp() as u64;
+        Ok(slot)
+    }
+
+    async fn get_nonce(&self, _address: &str) -> Result<u64, WalletError> {
+        // For Solana, nonce is not used in the same way as Ethereum
+        // We'll simulate a nonce based on recent blockhash
         let slot = chrono::Utc::now().timestamp() as u64;
         Ok(slot)
     }

@@ -25,19 +25,47 @@ impl WalletInfo {
             networks: vec!["eth".to_string(), "solana".to_string()],
         }
     }
+
+    /// Legacy AAD (v1): wallet name bytes
+    pub fn aad_v1(&self) -> Vec<u8> {
+        self.name.as_bytes().to_vec()
+    }
+
+    /// Stable AAD (v2): domain tag + wallet UUID bytes
+    pub fn aad_v2(&self) -> Vec<u8> {
+        let mut out = b"DEFISAFE-AAD-V2".to_vec();
+        out.extend_from_slice(self.id.as_bytes());
+        out
+    }
+
+    /// HKDF info (v1): label + v1 AAD
+    pub fn hkdf_info_v1(&self) -> Vec<u8> {
+        [b"wallet-master-key".as_ref(), self.aad_v1().as_slice()].concat()
+    }
+
+    /// HKDF info (v2): label + v2 AAD
+    pub fn hkdf_info_v2(&self) -> Vec<u8> {
+        [b"wallet-master-key-v2".as_ref(), self.aad_v2().as_slice()].concat()
+    }
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct SecureWalletData {
     pub info: WalletInfo,
     pub encrypted_master_key: Vec<u8>,
+    pub shamir_shares: Vec<Vec<u8>>,
     pub salt: Vec<u8>,
     pub nonce: Vec<u8>,
+    #[serde(default = "SecureWalletData::default_schema_version")]
+    pub schema_version: u8,
+    #[serde(default)]
+    pub kek_id: Option<String>,
 }
 
 impl Zeroize for SecureWalletData {
     fn zeroize(&mut self) {
         self.encrypted_master_key.zeroize();
+        self.shamir_shares.zeroize();
         self.salt.zeroize();
         self.nonce.zeroize();
         // Note: info does not contain sensitive data, so no need to zeroize
@@ -49,12 +77,24 @@ impl ZeroizeOnDrop for SecureWalletData {}
 impl SecureWalletData {
     /// Creates a new SecureWalletData with empty encrypted fields.
     pub fn new(info: WalletInfo) -> Self {
-        Self { info, encrypted_master_key: Vec::new(), salt: Vec::new(), nonce: Vec::new() }
+        Self {
+            info,
+            encrypted_master_key: Vec::new(),
+            shamir_shares: Vec::new(),
+            salt: Vec::new(),
+            nonce: Vec::new(),
+            schema_version: Self::default_schema_version(),
+            kek_id: None,
+        }
     }
 
     /// Zeroizes sensitive data manually.
     pub fn zeroize(&mut self) {
         <Self as Zeroize>::zeroize(self);
+    }
+
+    pub fn default_schema_version() -> u8 {
+        2
     }
 }
 

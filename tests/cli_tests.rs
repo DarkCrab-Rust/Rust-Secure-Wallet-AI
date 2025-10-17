@@ -43,6 +43,9 @@ fn test_cli_list_wallets() {
 fn test_cli_generate_mnemonic() {
     let output = Command::new("cargo")
         .args(["run", "--bin", "wallet-cli", "--", "generate-mnemonic"])
+        .env("ALLOW_PLAINTEXT_MNEMONIC", "1")
+        .env("ALLOW_PLAINTEXT_MNEMONIC_CONFIRM", "1")
+        .env("WALLET_TEST_CONSTRUCTOR", "1")
         .output()
         .expect("Failed to execute command");
 

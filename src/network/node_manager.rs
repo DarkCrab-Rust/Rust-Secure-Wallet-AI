@@ -4,6 +4,7 @@ use reqwest::Client;
 use serde_json::json;
 
 use crate::core::domain::Tx;
+use crate::security::redaction::redact_body;
 
 /// Return a default RPC node URL (can be replaced by configuration later).
 pub fn select_node() -> Option<String> {
@@ -31,7 +32,8 @@ impl NodeManager {
     /// Send a raw transaction via JSON-RPC eth_sendRawTransaction.
     /// Expects Tx::serialize() to return raw bytes of the signed transaction.
     pub async fn send_tx(&self, tx: Tx) -> Result<String> {
-        let raw_hex = format!("0x{}", hex::encode(tx.serialize()));
+        let raw_bytes = tx.serialize()?;
+        let raw_hex = format!("0x{}", hex::encode(raw_bytes));
         let payload = json!({
             "jsonrpc": "2.0",
             "method": "eth_sendRawTransaction",
@@ -45,14 +47,18 @@ impl NodeManager {
         let body: serde_json::Value = resp.json().await.map_err(|e| anyhow!(e))?;
 
         if !status.is_success() {
-            return Err(anyhow!("rpc error status: {} body: {:?}", status, body));
+            return Err(anyhow!(
+                "rpc error status: {} body: {}",
+                status,
+                redact_body(&body.to_string())
+            ));
         }
         if let Some(result) = body.get("result").and_then(|v| v.as_str()) {
             Ok(result.to_string())
         } else if let Some(err) = body.get("error") {
-            Err(anyhow!("rpc returned error: {:?}", err))
+            Err(anyhow!("rpc returned error: {}", redact_body(&err.to_string())))
         } else {
-            Err(anyhow!("unexpected rpc response: {:?}", body))
+            Err(anyhow!("unexpected rpc response: {}", redact_body(&body.to_string())))
         }
     }
 }

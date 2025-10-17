@@ -1,0 +1,28 @@
+name: Block accidental prints
+
+on: [push, pull_request]
+
+jobs:
+  no-prints:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check for accidental prints (println/eprintln/dbg)
+        run: |
+          set -euo pipefail
+          # Search source files excluding test directories and bins where prints are expected
+          # If matches are found, print them and exit non-zero
+          echo "Searching for forbidden macros in src/ (excluding src/bin and tests)"
+          matches=$(git grep -n --line-number --untracked --extended-regexp "(^|[^\w])(?:println!|eprintln!|dbg!)" -- 'src/**' || true)
+          if [ -n "$matches" ]; then
+            # Filter out allowed directories
+            echo "$matches" | grep -vE '^src/bin/' | grep -vE '^src/.*_tests?\.rs:' | grep -vE '^src/.*/tests?/' || true
+            # If after filtering there are still lines, fail
+            filtered=$(echo "$matches" | grep -vE '^src/bin/' | grep -vE '^src/.*_tests?\.rs:' | grep -vE '^src/.*/tests?/' || true)
+            if [ -n "$filtered" ]; then
+              echo "\nForbidden print macros found in non-test source files:\n"
+              echo "$filtered"
+              exit 1
+            fi
+          fi
+          echo "No forbidden prints found."

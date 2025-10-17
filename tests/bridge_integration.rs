@@ -20,15 +20,18 @@ fn create_test_config() -> WalletConfig {
         },
         quantum_safe: false,
         multi_sig_threshold: 2,
+        derivation: Default::default(),
     }
 }
 
 /// Create an axum_test::TestServer wired to the app router
 async fn setup_test_server() -> TestServer {
     let config = create_test_config();
-    let server = WalletServer::new("127.0.0.1".to_string(), 0, config, None)
+    // Use the test-only constructor so deterministic test envs are applied
+    // (WALLET_ENC_KEY, TEST_SKIP_DECRYPT, BRIDGE_MOCK_FORCE_SUCCESS, ALLOW_BRIDGE_MOCKS)
+    let server = WalletServer::new_for_test("127.0.0.1".to_string(), 0, config, None, None)
         .await
-        .expect("Failed to create server");
+        .expect("Failed to create test server");
     let app = server.create_router().await;
     let cfg = TestServerConfig::default();
     TestServer::new_with_config(app, cfg).expect("failed to create TestServer")

@@ -4,7 +4,7 @@ use pbkdf2::pbkdf2_hmac;
 use scrypt::Params;
 use sha2::Sha256;
 use tracing::{debug, info};
-use zeroize::Zeroize;
+use zeroize::{Zeroize, Zeroizing};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum KDFAlgorithm {
@@ -34,7 +34,7 @@ impl KeyDerivation {
         Self::new(KDFAlgorithm::HKDF)
     }
 
-    pub fn derive_key(&self, password: &[u8], salt: &[u8], key_length: usize) -> Result<Vec<u8>> {
+    pub fn derive_key(&self, password: &[u8], salt: &[u8], key_length: usize) -> Result<Zeroizing<Vec<u8>>> {
         debug!("Deriving key with length {} bytes", key_length);
 
         match &self.algorithm {
@@ -54,11 +54,11 @@ impl KeyDerivation {
         salt: &[u8],
         iterations: u32,
         key_length: usize,
-    ) -> Result<Vec<u8>> {
+    ) -> Result<Zeroizing<Vec<u8>>> {
         debug!("Using PBKDF2 with {} iterations", iterations);
 
-        let mut key = vec![0u8; key_length];
-        pbkdf2_hmac::<Sha256>(password, salt, iterations, &mut key);
+    let mut key = Zeroizing::new(vec![0u8; key_length]);
+    pbkdf2_hmac::<Sha256>(password, salt, iterations, &mut key);
 
         debug!("鉁?PBKDF2 key derived successfully");
         Ok(key)
@@ -72,14 +72,14 @@ impl KeyDerivation {
         r: u32,
         p: u32,
         key_length: usize,
-    ) -> Result<Vec<u8>> {
+    ) -> Result<Zeroizing<Vec<u8>>> {
         debug!("Using Scrypt with parameters N={}, r={}, p={}", n, r, p);
 
         let params = Params::new((n as f64).log2() as u8, r, p, key_length)
             .map_err(|e| anyhow::anyhow!("Invalid Scrypt parameters: {}", e))?;
 
-        let mut key = vec![0u8; key_length];
-        scrypt::scrypt(password, salt, &params, &mut key)
+    let mut key = Zeroizing::new(vec![0u8; key_length]);
+    scrypt::scrypt(password, salt, &params, &mut key)
             .map_err(|e| anyhow::anyhow!("Scrypt derivation failed: {}", e))?;
 
         debug!("鉁?Scrypt key derived successfully");
@@ -91,13 +91,13 @@ impl KeyDerivation {
         input_key_material: &[u8],
         salt: &[u8],
         key_length: usize,
-    ) -> Result<Vec<u8>> {
+    ) -> Result<Zeroizing<Vec<u8>>> {
         debug!("Using HKDF key derivation");
 
         let hk = Hkdf::<Sha256>::new(Some(salt), input_key_material);
-        let mut key = vec![0u8; key_length];
+    let mut key = Zeroizing::new(vec![0u8; key_length]);
 
-        hk.expand(b"defi-wallet-key", &mut key)
+    hk.expand(b"defi-wallet-key", &mut key)
             .map_err(|e| anyhow::anyhow!("HKDF expansion failed: {}", e))?;
 
         debug!("鉁?HKDF key derived successfully");
@@ -107,7 +107,7 @@ impl KeyDerivation {
     pub fn generate_salt(length: usize) -> Vec<u8> {
         use rand::RngCore;
         let mut salt = vec![0u8; length];
-        rand::thread_rng().fill_bytes(&mut salt);
+        rand::rngs::OsRng.fill_bytes(&mut salt);
         salt
     }
 
@@ -117,7 +117,7 @@ impl KeyDerivation {
         passphrase: &str,
         salt: &[u8],
         key_length: usize,
-    ) -> Result<Vec<u8>> {
+    ) -> Result<Zeroizing<Vec<u8>>> {
         debug!("Deriving key from mnemonic phrase");
 
         // Combine mnemonic and passphrase
@@ -139,7 +139,7 @@ impl KeyDerivation {
         index: u32,
         chain_code: &[u8],
         key_length: usize,
-    ) -> Result<Vec<u8>> {
+    ) -> Result<Zeroizing<Vec<u8>>> {
         debug!("Deriving child key with index: {}", index);
 
         // Simplified child key derivation (BIP32-like)
@@ -148,11 +148,14 @@ impl KeyDerivation {
 
         let child_key = self.derive_key(&input, chain_code, key_length)?;
 
+        // Zeroize temporary buffer containing sensitive material
+        input.zeroize();
+
         debug!("鉁?Child key derived successfully");
         Ok(child_key)
     }
 
-    pub fn strengthen_key(&self, weak_key: &[u8], salt: &[u8]) -> Result<Vec<u8>> {
+    pub fn strengthen_key(&self, weak_key: &[u8], salt: &[u8]) -> Result<Zeroizing<Vec<u8>>> {
         debug!("Strengthening weak key material");
 
         // Use a high iteration count for strengthening

@@ -65,14 +65,17 @@ fn create_mock_wallet_data() -> SecureWalletData {
             networks: vec!["eth".to_string(), "solana".to_string(), "bsc".to_string()],
         },
         encrypted_master_key: vec![1, 2, 3, 4],
+        shamir_shares: vec![vec![1, 2, 3], vec![4, 5, 6], vec![7, 8, 9]],
         salt: vec![5, 6, 7, 8],
         nonce: vec![9, 10, 11, 12],
+        schema_version: defi_hot_wallet::core::SecureWalletData::default_schema_version(),
+        kek_id: None,
     }
 }
 
 // Helper function to monitor bridge transaction status
 async fn monitor_bridge_status(bridge: &impl Bridge, tx_hash: &str) {
-    println!("Monitoring bridge transaction: {}", tx_hash);
+    tracing::info!("Monitoring bridge transaction: {}", tx_hash);
 
     // polling limits and timeout
     let max_checks = 10;
@@ -81,23 +84,23 @@ async fn monitor_bridge_status(bridge: &impl Bridge, tx_hash: &str) {
 
     for i in 1..=max_checks {
         if start_time.elapsed() > timeout {
-            println!("Monitoring timed out after {} seconds", timeout.as_secs());
+            tracing::warn!("Monitoring timed out after {} seconds", timeout.as_secs());
             break;
         }
 
         tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
         match bridge.check_transfer_status(tx_hash).await {
             Ok(status) => {
-                println!("Status check {}: {:?}", i, status);
+                tracing::debug!(check = i, ?status, "Status check");
                 if matches!(status, BridgeTransactionStatus::Completed) {
-                    println!("Bridge transfer completed!");
+                    tracing::info!("Bridge transfer completed");
                 }
                 if let BridgeTransactionStatus::Failed(ref reason) = status {
-                    println!("Bridge transfer failed: {}", reason);
+                    tracing::warn!("Bridge transfer failed: {}", reason);
                 }
             }
             Err(e) => {
-                println!("Error checking status: {}", e);
+                tracing::warn!("Error checking status: {}", e);
             }
         }
     }
@@ -110,37 +113,37 @@ async fn execute_bridge_command(
 ) -> Result<(), Box<dyn std::error::Error>> {
     match command {
         Commands::EthToSol { amount, token } => {
-            println!("Testing ETH to Solana bridge with {} {}", amount, token);
+            tracing::info!(amount = %amount, token = %token, "Testing ETH to Solana bridge");
 
             let bridge = EthereumToSolanaBridge::new("0xMockBridgeContract");
             let result = bridge
                 .transfer_across_chains("eth", "solana", &token, &amount, &wallet_data)
                 .await?;
 
-            println!("Bridge transaction initiated: {}", result);
+            tracing::info!(tx = %result, "Bridge transaction initiated");
             monitor_bridge_status(&bridge, &result).await;
         }
 
         Commands::SolToEth { amount, token } => {
-            println!("Testing Solana to ETH bridge with {} {}", amount, token);
+            tracing::info!(amount = %amount, token = %token, "Testing Solana to ETH bridge");
 
             let bridge = SolanaToEthereumBridge::new("0xMockReverseBridgeContract");
             let result = bridge
                 .transfer_across_chains("solana", "eth", &token, &amount, &wallet_data)
                 .await?;
 
-            println!("Bridge transaction initiated: {}", result);
+            tracing::info!(tx = %result, "Bridge transaction initiated");
             monitor_bridge_status(&bridge, &result).await;
         }
 
         Commands::EthToBsc { amount, token } => {
-            println!("Testing ETH to BSC bridge with {} {}", amount, token);
+            tracing::info!(amount = %amount, token = %token, "Testing ETH to BSC bridge");
 
             let bridge = EthereumToBSCBridge::new("0xMockEthBscBridge");
             let result =
                 bridge.transfer_across_chains("eth", "bsc", &token, &amount, &wallet_data).await?;
 
-            println!("Bridge transaction initiated: {}", result);
+            tracing::info!(tx = %result, "Bridge transaction initiated");
             monitor_bridge_status(&bridge, &result).await;
         }
     }
@@ -202,10 +205,13 @@ mod tests {
 
     #[tokio::test]
     async fn test_bridge_execution() {
+        // Allow bridge mocks for this test run and force success
+        std::env::set_var("ALLOW_BRIDGE_MOCKS", "1");
         std::env::set_var("BRIDGE_MOCK_FORCE_SUCCESS", "1");
         let result = run_bridge_test("eth", "solana", "10.0", "USDC").await;
         assert!(result.is_ok());
         std::env::remove_var("BRIDGE_MOCK_FORCE_SUCCESS");
+        std::env::remove_var("ALLOW_BRIDGE_MOCKS");
     }
 
     #[tokio::test]
@@ -219,10 +225,12 @@ mod tests {
 
     #[tokio::test]
     async fn test_bridge_zero_value() {
+        std::env::set_var("ALLOW_BRIDGE_MOCKS", "1");
         std::env::set_var("BRIDGE_MOCK_FORCE_SUCCESS", "1");
         let result = run_bridge_test("eth", "solana", "0.0", "USDC").await;
         assert!(result.is_ok());
         std::env::remove_var("BRIDGE_MOCK_FORCE_SUCCESS");
+        std::env::remove_var("ALLOW_BRIDGE_MOCKS");
     }
 
     #[tokio::test]

@@ -98,14 +98,8 @@ where
     }
 
     fn create_wallet_from_private_key(&self, private_key: &[u8]) -> Result<LocalWallet> {
-        eprintln!(
-            "create_wallet_from_private_key: incoming private_key.len() = {}",
-            private_key.len()
-        );
-        eprintln!(
-            "create_wallet_from_private_key: bytes = {}",
-            hex::encode(&private_key[..std::cmp::min(32, private_key.len())])
-        );
+        // Do not log private key material. Validate length only.
+        tracing::debug!("create_wallet_from_private_key: incoming private_key.len() = {}", private_key.len());
         if private_key.len() != 32 {
             return Err(anyhow::anyhow!("Private key must be 32 bytes"));
         }
@@ -118,11 +112,11 @@ where
     }
 
     pub async fn get_gas_price(&self) -> Result<U256> {
-        eprintln!("get_gas_price: called");
+        tracing::debug!("get_gas_price called");
         let res = self.provider.get_gas_price().await;
         match res {
             Ok(v) => {
-                eprintln!("get_gas_price: got = 0x{:x}", v);
+                tracing::debug!("get_gas_price got = 0x{:x}", v);
                 Ok(v)
             }
             Err(e) => Err(anyhow::anyhow!("Failed to get gas price: {}", e)),
@@ -130,11 +124,11 @@ where
     }
 
     pub async fn get_nonce(&self, address: &Address) -> Result<U256> {
-        eprintln!("get_nonce: called for address: 0x{}", hex::encode(address));
+    tracing::debug!(address = %hex::encode(address), "get_nonce called for address");
         let res = self.provider.get_transaction_count(*address, None).await;
         match res {
             Ok(v) => {
-                eprintln!("get_nonce: got = 0x{:x}", v);
+                tracing::debug!("get_nonce got = 0x{:x}", v);
                 Ok(v)
             }
             Err(e) => Err(anyhow::anyhow!("Failed to get nonce: {}", e)),
@@ -187,10 +181,9 @@ where
         let amount_wei =
             parse_ether(amount).map_err(|e| anyhow::anyhow!("Invalid amount: {}", e))?;
 
-        let gas_price = self.get_gas_price().await?;
-        let nonce = self.get_nonce(&wallet.address()).await?;
-        eprintln!("send_transaction: gas_price = 0x{:x}", gas_price);
-        eprintln!("send_transaction: nonce = 0x{:x}", nonce);
+    let gas_price = self.get_gas_price().await?;
+    let nonce = self.get_nonce(&wallet.address()).await?;
+    tracing::debug!("send_transaction values", gas_price = %format!("0x{:x}", gas_price), nonce = %format!("0x{:x}", nonce));
 
         let tx = TransactionRequest::new()
             .to(to_address)

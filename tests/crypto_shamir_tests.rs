@@ -14,7 +14,7 @@ fn test_shamir_secret_sharing_basic() {
     let shares = split_secret(secret, threshold, shares_count).unwrap();
     assert_eq!(shares.len(), shares_count as usize);
 
-    let recovered = combine_secret(&shares[0..threshold as usize]).unwrap();
+    let recovered = combine_secret(&shares[0..threshold as usize], threshold).unwrap();
     assert_eq!(recovered, secret);
 }
 
@@ -27,7 +27,7 @@ fn test_shamir_insufficient_shares() {
 
     let shares = split_secret(secret, threshold, shares_count).unwrap();
 
-    let result = combine_secret(&shares[0..(threshold as usize - 1)]);
+    let result = combine_secret(&shares[0..(threshold as usize - 1)], threshold);
     assert!(result.is_err());
 }
 
@@ -65,7 +65,7 @@ fn test_shamir_reconstruct_exact() {
     let result = split_secret(secret, 2, 3);
 
     let shares = result.unwrap();
-    let recovered = combine_shares(&shares[0..2]).unwrap();
+    let recovered = combine_shares(&shares[0..2], 2).unwrap();
     assert_eq!(recovered, secret);
 }
 
@@ -78,13 +78,13 @@ fn test_shamir_different_share_subsets() {
 
     let shares = split_secret(secret, threshold, shares_count).unwrap();
 
-    let recovered = combine_shares(&shares[0..threshold as usize]).unwrap();
+    let recovered = combine_shares(&shares[0..threshold as usize], threshold).unwrap();
     assert_eq!(recovered, secret);
 
     // test a different subset of shares
     let combination: Vec<(u8, [u8; 32])> = vec![shares[0], shares[2], shares[4]];
 
-    let recovered2 = combine_shares(&combination).unwrap();
+    let recovered2 = combine_shares(&combination, threshold).unwrap();
     assert_eq!(recovered2, secret);
 }
 
@@ -100,7 +100,7 @@ fn test_shamir_all_possible_combinations() {
     // test all combinations of `threshold` shares
     for combo in shares.iter().combinations(threshold as usize) {
         let selected_shares: Vec<(u8, [u8; 32])> = combo.into_iter().copied().collect();
-        let recovered = combine_shares(&selected_shares).unwrap();
+        let recovered = combine_shares(&selected_shares, threshold).unwrap();
         assert_eq!(recovered, secret);
     }
 }
@@ -120,7 +120,7 @@ fn test_shamir_tampered_share() {
 
     // tamper with one share's first byte
     shares[1].1[0] ^= 0xFF;
-    let result = combine_shares(&shares[0..threshold as usize]);
+    let result = combine_shares(&shares[0..threshold as usize], threshold);
     // Combining may succeed but should not equal original secret
     assert!(result.is_ok());
     assert_ne!(result.unwrap(), secret);

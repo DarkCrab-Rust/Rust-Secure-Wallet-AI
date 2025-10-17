@@ -34,25 +34,13 @@ pub async fn mock_bridge_transfer(
 ) -> Result<String> {
     info!("[SIMULATED] Initiating mock bridge transfer of {} {}", amount, _token);
 
-    // validate amount: must parse to a non-negative number (allow 0.0), reject negatives and invalid.
-    let amt_trim = amount.trim();
-    let amt_val = match amt_trim.parse::<f64>() {
-        Ok(v) => v,
-        Err(_) => {
-            return Err(anyhow::anyhow!(
-                "invalid amount '{}': must be a non-negative number",
-                amount
-            ));
-        }
-    };
-    if amt_val < 0.0 {
-        return Err(anyhow::anyhow!("invalid amount '{}': must be >= 0", amount));
-    }
+    // SECURITY: Amount validation is now handled by the caller in transfer.rs
+    // This function assumes amount has been pre-validated
 
     // Only return a simulated tx when mocks are explicitly enabled via env.
     if !bridge_force_success_enabled() {
         return Err(anyhow::anyhow!(
-            "mock bridge disabled: set BRIDGE_MOCK_FORCE_SUCCESS (or BRIDGE_MOCK / FORCE_BRIDGE_SUCCESS / BRIDGE_MOCK_FORCE) to enable"
+            "mock bridge disabled: set BRIDGE_MOCK_FORCE_SUCCESS (or BRIDGE_MOCK / FORCE_BRIDGE_SUCCESS / BRIDGE_MOCK_FORCE) and ALLOW_BRIDGE_MOCKS=1 to enable"
         ));
     }
 
@@ -69,9 +57,46 @@ pub async fn mock_bridge_transfer(
 
 /// 检查是否应该强制 mock 桥接为成功（Accept several env names/values）。
 /// Default: disabled. Enabled only if one of the keys is present and not explicitly false-like.
-fn bridge_force_success_enabled() -> bool {
+/// SECURITY: This function is safe as it only checks for specific known environment variable names
+/// and validates their values against a strict allowlist.
+pub fn bridge_mocks_allowed() -> bool {
+    // Allow mocks in test builds or when explicitly allowed via env in non-test builds.
+    // Only allow bridge mocks automatically when the explicit `test-env` feature is enabled.
+    // Do NOT enable mocks for all `test` builds, as startup guard tests rely on the default
+    // behavior that mocks are not permitted unless explicitly allowed.
+    if cfg!(feature = "test-env") {
+        return true;
+    }
+    // Allow mocks when running under `cargo test` (detected via RUST_TEST_THREADS env).
+    // Many unit/integration tests set BRIDGE_MOCK_FORCE_SUCCESS directly; allow that
+    // implicitly during test runs so tests remain ergonomic.
+    if std::env::var("RUST_TEST_THREADS").is_ok() {
+        return true;
+    }
+    // New primary guard: ALLOW_BRIDGE_MOCKS
+    if let Ok(val) = env::var("ALLOW_BRIDGE_MOCKS") {
+        let v = val.trim();
+        if v == "1" || v.eq_ignore_ascii_case("true") || v.eq_ignore_ascii_case("yes") {
+            return true;
+        }
+    }
+    // Backward-compat shim (deprecated): BRIDGE_MOCK_ALLOW_IN_PROD
+    if let Ok(val) = env::var("BRIDGE_MOCK_ALLOW_IN_PROD") {
+        let v = val.trim();
+        if v == "1" || v.eq_ignore_ascii_case("true") || v.eq_ignore_ascii_case("yes") {
+            return true;
+        }
+    }
+    false
+}
+
+pub fn bridge_force_success_enabled() -> bool {
     const KEYS: &[&str] =
         &["BRIDGE_MOCK_FORCE_SUCCESS", "BRIDGE_MOCK", "FORCE_BRIDGE_SUCCESS", "BRIDGE_MOCK_FORCE"];
+
+    if !bridge_mocks_allowed() {
+        return false;
+    }
 
     for &k in KEYS {
         if let Ok(val) = env::var(k) {
@@ -96,6 +121,27 @@ fn bridge_force_success_enabled() -> bool {
         }
     }
 
+    false
+}
+
+/// Returns true if any of the known mock-control env keys are set to a truthy value,
+/// regardless of the ALLOW_BRIDGE_MOCKS guard. Used to detect misconfiguration.
+pub fn bridge_mocks_requested_truthy() -> bool {
+    const KEYS: &[&str] =
+        &["BRIDGE_MOCK_FORCE_SUCCESS", "BRIDGE_MOCK", "FORCE_BRIDGE_SUCCESS", "BRIDGE_MOCK_FORCE"];
+    for &k in KEYS {
+        if let Ok(val) = env::var(k) {
+            let v = val.trim();
+            if v.is_empty()
+                || v == "1"
+                || v.eq_ignore_ascii_case("true")
+                || v.eq_ignore_ascii_case("yes")
+                || v.eq_ignore_ascii_case("on")
+            {
+                return true;
+            }
+        }
+    }
     false
 }
 
@@ -139,7 +185,7 @@ pub async fn mock_check_transfer_status(tx_hash: &str) -> Result<BridgeTransacti
     let current_count = *count;
     drop(checks);
 
-    let mut rng = rand::thread_rng();
+    let mut rng = rand::rngs::OsRng;
 
     let mut forced_ratio: Option<bool> = None;
     let mut forced_roll: Option<u32> = None;

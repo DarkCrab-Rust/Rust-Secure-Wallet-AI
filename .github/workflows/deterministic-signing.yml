@@ -1,0 +1,43 @@
+name: Deterministic Signing Tests
+
+on:
+  push:
+    branches: [ main, master, archive-bridge-stub ]
+  pull_request:
+    branches: [ main, master, archive-bridge-stub ]
+
+jobs:
+  deterministic-signing:
+    name: Run deterministic signing tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/gh-actions-rust-toolchain@stable
+
+      - name: Cache cargo registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Build (fast)
+        run: |
+          cargo build -q --release
+
+      - name: Run deterministic signing tests
+        env:
+          RUST_BACKTRACE: 1
+        run: |
+          # Run the two deterministic tests explicitly to keep job fast and focused
+          cargo test -q --test deterministic_signing -- --test-threads=1
+          cargo test -q --test transaction_signature_consistency -- --test-threads=1
+
+      - name: Run clippy (optional, non-blocking)
+        if: always()
+        run: |
+          cargo clippy -q --all-targets -- -D warnings || true

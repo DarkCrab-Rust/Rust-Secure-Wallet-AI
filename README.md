@@ -48,6 +48,8 @@ curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 sudo apt-get install build-essential pkg-config libssl-dev
 ```
 
+See `docs/env_vars.md` for accepted environment variable formats and developer flags (mnemonic export, secret formats).
+
 ### 安装 / Installation
 
 ```bash
@@ -187,6 +189,53 @@ hsm.write_secure_memory(region_id, sensitive_data).await?;
 // 自动零化清理
 hsm.free_secure_memory(region_id).await?;
 ```
+
+### 密钥轮换 / Key Rotation
+
+钱包为每个钱包维护可版本化的“签名密钥标签”，默认标签格式：`wallet:<name>:signing`。
+
+- 创建钱包时会自动创建 v1 版本并持久化到 `key_labels`/`key_versions` 表。
+- 每次使用当前版本签名时，`usage_count` 会自增。
+- 轮换会将旧版本标记为 `retired`，并生成新版本（v+1），更新标签的 `current_version/current_id`。
+
+编程接口（Rust）：
+
+```rust
+// 轮换签名密钥
+let (old_v, new_v) = wallet_manager.rotate_signing_key("my-wallet").await?;
+assert_eq!(old_v + 1, new_v);
+```
+
+HTTP 接口（Server）：
+
+```bash
+curl -X POST http://localhost:8080/api/wallets/my-wallet/rotate-signing-key \
+  -H "Authorization: <YOUR_API_KEY>"
+
+# 响应：
+# { "wallet": "my-wallet", "old_version": 1, "new_version": 2 }
+```
+
+注意：密钥材料在内存中采用 WALLET_ENC_KEY（Base64 32字节）派生的 AES-256-GCM 包封加密存储。
+需要在进程环境中设置：
+
+```bash
+export WALLET_ENC_KEY="<base64-encoded-32-bytes>"
+```
+
+测试环境（启用 `test-env` feature）会自动注入全零占位键以确保测试稳定；生产环境会拒绝弱默认值。
+
+### 生产安全开关 / Production Safety Switches
+
+- 桥接模拟（bridge mocks）在测试构建中默认启用；在非测试环境下必须显式设置：
+  - `ALLOW_BRIDGE_MOCKS=1` 且 同时设置以下任一：
+    - `BRIDGE_MOCK_FORCE_SUCCESS=1`（或留空）
+    - `BRIDGE_MOCK=1`
+    - `FORCE_BRIDGE_SUCCESS=1`
+    - `BRIDGE_MOCK_FORCE=1`
+- 如果设置了 mock 相关变量但没有 `ALLOW_BRIDGE_MOCKS=1`，服务器会在启动时立即失败并给出清晰提示，避免生产误用。
+
+更多细节见 `SECURITY_NOTES.md`。
 
 ## 📊 监控指标 / Monitoring
 
@@ -346,6 +395,40 @@ export WALLET_SOLANA_RPC_URL="https://api.mainnet-beta.solana.com"
 export WALLET_ENCRYPTION_KEY_PATH="./keys/master.key"
 export WALLET_HSM_ENABLED="false"
 ```
+
+## 🔑 派生路径配置 / Derivation Paths Configuration
+
+钱包支持通过配置自定义 HD 派生路径（BIP‑44 for Ethereum 家族；SLIP‑0010 for Solana 家族）。默认值遵循社区惯例，并已在测试中锁定向量保证可重复性。
+
+- ETH 默认路径: m/44'/60'/0'/0/0（account 硬化，change/index 非硬化）
+- SOL 默认路径: m/44'/501'/0'/0'/0'（全部硬化，符合 SLIP‑0010/Ed25519 要求）
+
+示例：在 `WalletConfig` 中覆盖 account/change/index（Rust 代码）
+
+```rust
+use defi_hot_wallet::core::config::WalletConfig;
+
+let mut cfg = WalletConfig::default();
+// 针对 ETH 家族（eth/ethereum/sepolia/polygon/bsc 等）
+cfg.derivation.eth.account = 1; // m/44'/60'/1'
+cfg.derivation.eth.change = 0;  // change = 0
+cfg.derivation.eth.index = 5;   // index = 5 → m/44'/60'/1'/0/5
+
+// 针对 SOL 家族（sol/solana/solana-devnet），全部为硬化层级
+cfg.derivation.solana.account = 2; // m/44'/501'/2'/0'/0'
+cfg.derivation.solana.change = 0;  // m/44'/501'/2'/0'/0'
+cfg.derivation.solana.index = 0;   // m/44'/501'/2'/0'/0'
+```
+
+注意：
+- 仅更改 account/change/index 三个数字即可，coin_type 已固定（ETH=60, SOL=501）。
+- 不同家族的硬化规则已在内部处理，无需显式标注 `'`。
+- API/服务读取 `WalletConfig` 后，在 `WalletManager` 中构造派生路径；对生产/测试均生效。
+
+测试向量（简要）：
+- ETH 零种子地址从默认路径派生为固定 0x… 值（见 `core::wallet_manager::bip44_eth_tests`）。
+- SOL 零种子地址从默认路径派生为 `HVEMhZbB…8BgZ`（见 `core::wallet_manager_slip10_solana_tests`）。
+
 
 ## 🤝 贡献指南 / Contributing
 

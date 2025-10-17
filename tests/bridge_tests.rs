@@ -1,6 +1,8 @@
 // tests/bridge_tests.rs
 //! 妗ユ帴鍔熻兘娴嬭瘯
 
+mod util;
+
 use anyhow::Result;
 use chrono::Utc;
 use defi_hot_wallet::blockchain::bridge::{
@@ -22,13 +24,20 @@ fn create_mock_wallet_data() -> SecureWalletData {
             networks: vec!["eth".to_string(), "solana".to_string()],
         },
         encrypted_master_key: vec![1, 2, 3, 4],
+        shamir_shares: vec![vec![1, 2, 3], vec![4, 5, 6], vec![7, 8, 9]],
         salt: vec![5, 6, 7, 8],
         nonce: vec![9, 10, 11, 12],
+        schema_version: defi_hot_wallet::core::SecureWalletData::default_schema_version(),
+        kek_id: None,
     }
 }
 
 #[tokio::test]
 async fn test_ethereum_to_solana_bridge() -> Result<()> {
+    // Set mock behavior and centralized test env (KEEP BRIDGE_MOCK_FORCE_SUCCESS local)
+    std::env::set_var("BRIDGE_MOCK_FORCE_SUCCESS", "1");
+    util::set_test_env();
+
     let bridge = EthereumToSolanaBridge::new("0xMockBridgeContract");
     let wallet_data = create_mock_wallet_data();
 
@@ -48,6 +57,10 @@ async fn test_ethereum_to_solana_bridge() -> Result<()> {
 
 #[tokio::test]
 async fn test_solana_to_ethereum_bridge() -> Result<()> {
+    // Set mock behavior and centralized test env (KEEP BRIDGE_MOCK_FORCE_SUCCESS local)
+    std::env::set_var("BRIDGE_MOCK_FORCE_SUCCESS", "1");
+    util::set_test_env();
+
     let bridge = SolanaToEthereumBridge::new("0xMockReverseBridgeContract");
     let wallet_data = create_mock_wallet_data();
 
@@ -57,6 +70,10 @@ async fn test_solana_to_ethereum_bridge() -> Result<()> {
 
 #[tokio::test]
 async fn test_ethereum_to_bsc_bridge() -> Result<()> {
+    // Set mock behavior and centralized test env (KEEP BRIDGE_MOCK_FORCE_SUCCESS local)
+    std::env::set_var("BRIDGE_MOCK_FORCE_SUCCESS", "1");
+    util::set_test_env();
+
     let bridge = EthereumToBSCBridge::new("0xMockEthBscBridge");
     let wallet_data = create_mock_wallet_data();
 
@@ -66,6 +83,10 @@ async fn test_ethereum_to_bsc_bridge() -> Result<()> {
 
 #[tokio::test]
 async fn integration_transfer_and_failed_marker() -> Result<()> {
+    // Set mock behavior and centralized test env (KEEP BRIDGE_MOCK_FORCE_SUCCESS local)
+    std::env::set_var("BRIDGE_MOCK_FORCE_SUCCESS", "1");
+    util::set_test_env();
+
     let bridge = EthereumToSolanaBridge::new("0xBridge");
     let w = create_mock_wallet_data();
 
@@ -85,6 +106,11 @@ async fn integration_transfer_and_failed_marker() -> Result<()> {
 
 #[tokio::test]
 async fn integration_mock_bridge_variants_and_concurrent() -> Result<()> {
+    // Set mock environment for bridge tests
+    std::env::set_var("BRIDGE_MOCK_FORCE_SUCCESS", "1");
+    // Allow bridge mocks in this test process
+    std::env::set_var("ALLOW_BRIDGE_MOCKS", "1");
+
     let s2e = SolanaToEthereumBridge::new("0xS2E");
     let e2b = EthereumToBSCBridge::new("0xE2B");
     let poly = PolygonToEthereumBridge::new("0xP2E");

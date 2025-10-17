@@ -23,6 +23,7 @@ fn create_mock_wallet_data() -> SecureWalletData {
             networks: vec!["eth".to_string(), "solana".to_string()],
         },
         encrypted_master_key: vec![],
+        shamir_shares: vec![],
         salt: vec![],
         nonce: vec![],
     }
