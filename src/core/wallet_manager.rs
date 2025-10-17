@@ -54,6 +54,7 @@ use crate::core::wallet::{backup, create, recover};
 use crate::core::wallet_info::{SecureWalletData, WalletInfo};
 use crate::crypto::{hsm::HSMManager, multisig::MultiSignature, quantum::QuantumSafeEncryption};
 use crate::storage::{WalletMetadata, WalletStorage, WalletStorageTrait};
+use crate::security::SecretVec;
 
 use crate::crypto::encryption_consistency::EncryptionAlgorithm;
 use crate::register_encryption_operation;
@@ -521,6 +522,24 @@ impl WalletManager {
         let mut tracker = self.nonce_tracker.lock().await;
         tracker.remove(&key);
         Ok(())
+    }
+
+    /// Sign a message using the HSM-managed key and return a zeroizing signature buffer.
+    ///
+    /// This wrapper delegates to the HSM manager which returns a `SecretVec`. Callers should
+    /// avoid printing or serializing the returned bytes directly. Convert to hex and drop the
+    /// secret buffer immediately if the bytes must be returned in an external API response.
+    pub async fn sign_with_hsm(
+        &self,
+        key_region_id: u64,
+        message: &[u8],
+    ) -> Result<SecretVec, WalletError> {
+        let sig = self
+            ._hsm
+            .secure_sign(key_region_id, message)
+            .await
+            .map_err(|e| WalletError::CryptoError(e.to_string()))?;
+        Ok(sig)
     }
 
     pub async fn get_balance(

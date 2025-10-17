@@ -9,6 +9,7 @@ use std::sync::Arc;
 use tokio::sync::Mutex;
 use tracing::{debug, info, warn};
 use zeroize::{Zeroize, ZeroizeOnDrop, Zeroizing};
+use crate::security::secret::{SecretVec, vec_to_secret};
 
 #[derive(Clone)]
 pub struct HSMConfig {
@@ -165,7 +166,7 @@ impl HSMManager {
         Ok(region_id)
     }
 
-    pub async fn secure_sign(&self, key_region_id: u64, message: &[u8]) -> Result<Vec<u8>> {
+    pub async fn secure_sign(&self, key_region_id: u64, message: &[u8]) -> Result<SecretVec> {
         debug!("Signing message with secure key {}", key_region_id);
 
         if !self.initialized {
@@ -216,7 +217,7 @@ impl HSMManager {
     let normalized = ensure_low_s(&compact);
 
     debug!("Message signed with secure ECDSA key (low-S normalized)");
-    Ok(normalized.to_vec())
+    Ok(vec_to_secret(normalized.to_vec()))
     }
 
     pub async fn get_memory_stats(&self) -> Result<HSMMemoryStats> {
@@ -342,15 +343,15 @@ mod tests {
         let key_id = hsm.secure_key_generation("ECDSA", 32).await.unwrap();
         assert!(key_id > 0);
 
-        // Sign with the key
-        let message = b"test message";
-        let signature = hsm.secure_sign(key_id, message).await.unwrap();
+    // Sign with the key
+    let message = b"test message";
+    let signature = hsm.secure_sign(key_id, message).await.unwrap();
 
-        // Verify signature is proper ECDSA format (64 bytes compact)
-        assert_eq!(signature.len(), 64, "ECDSA signature should be 64 bytes compact");
+    // Verify signature is proper ECDSA format (64 bytes compact)
+    assert_eq!((&*signature).len(), 64, "ECDSA signature should be 64 bytes compact");
 
-        // Verify signature is not just a hash (32 bytes)
-        assert_ne!(signature.len(), 32, "Signature should not be just a hash");
+    // Verify signature is not just a hash (32 bytes)
+    assert_ne!((&*signature).len(), 32, "Signature should not be just a hash");
 
         // Clean up
         hsm.free_secure_memory(key_id).await.unwrap();

@@ -15,6 +15,7 @@ fn tx_signing_roundtrip() {
     let public_key = derive_public_key_from_bytes(&private_key_bytes);
     let signature = sign_transaction(&tx, &private_key_bytes).expect("Failed to sign transaction");
 
-    assert!(verify_signature(&tx, &signature, &public_key));
-    assert!(is_signature_valid(&signature, &public_key));
+    // signature is a SecretVec (zeroizing Vec<u8>); use slice when checking
+    assert!(verify_signature(&tx, signature.as_ref(), &public_key));
+    assert!(is_signature_valid(signature.as_ref(), &public_key));
 }

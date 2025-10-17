@@ -664,8 +664,9 @@ mod tests {
 
     #[test]
     fn test_wallet_from_mnemonic() {
-        let wallet = crate::mvp::Wallet::from_mnemonic("test mnemonic").unwrap();
-        assert_eq!(wallet.mnemonic(), "test mnemonic");
+    let wallet = crate::mvp::Wallet::from_mnemonic("test mnemonic").unwrap();
+    let mn = wallet.mnemonic_secret();
+    assert_eq!(mn.as_str(), "test mnemonic");
     }
 
     #[test]

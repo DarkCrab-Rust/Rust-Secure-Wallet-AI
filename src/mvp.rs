@@ -7,6 +7,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Mutex;
 use zeroize::Zeroizing;
 use zeroize::{Zeroize, ZeroizeOnDrop};
+use crate::security::SecretVec;
 
 // 使用 lazy_static 初始化全局可变事务状态存储
 lazy_static! {
@@ -77,7 +78,17 @@ impl Wallet {
         self.private_key
     }
 
-    /// Return mnemonic as &str for read-only use. Avoid exposing in logs; prefer controlled flows.
+    /// Return the mnemonic as a zeroizing string (clone) so callers receive an owned
+    /// `Zeroizing<String>` which will be zeroed on drop. Prefer passing references
+    /// to signing flows instead of cloning when possible.
+    pub fn mnemonic_secret(&self) -> Zeroizing<String> {
+        self.mnemonic.clone()
+    }
+
+    /// Deprecated: original mnemonic() returned `&str` and exposed a live reference to
+    /// secret material. Prefer `mnemonic_secret()` which returns an owned zeroizing
+    /// buffer that will be cleared on drop.
+    #[deprecated(note = "Use mnemonic_secret() which returns an owned Zeroizing<String>")]
     pub fn mnemonic(&self) -> &str {
         &self.mnemonic
     }
@@ -191,7 +202,7 @@ pub fn derive_public_key_from_bytes(private_key_bytes: &[u8]) -> String {
     hex::encode(keypair.public_key().serialize())
 }
 
-pub fn sign_transaction(tx: &Transaction, private_key_bytes: &[u8]) -> Result<Vec<u8>, String> {
+pub fn sign_transaction(tx: &Transaction, private_key_bytes: &[u8]) -> Result<SecretVec, String> {
     // 使用安全的私钥包装器
     let secure_key = SecurePrivateKey::new(private_key_bytes.to_vec());
 
@@ -274,7 +285,8 @@ pub fn sign_transaction(tx: &Transaction, private_key_bytes: &[u8]) -> Result<Ve
     out.push(v);
 
     // secure_key 在函数结束时会自动通过ZeroizeOnDrop擦除内存
-    Ok(out)
+    // Wrap the output in a SecretVec so callers receive a zeroizing buffer.
+    Ok(crate::security::secret::vec_to_secret(out))
 }
 
 pub fn verify_signature(tx: &Transaction, sig: &[u8], public_key: &str) -> bool {
@@ -462,9 +474,9 @@ mod tests {
         // Signature should be 65 bytes (r||s||v)
         assert_eq!(signature.len(), 65);
 
-        // Verify the signature
-        assert!(verify_signature(&tx, &signature, &public_key));
-        assert!(is_signature_valid(&signature, &public_key));
+        // Verify the signature (signature is SecretVec - borrow as slice)
+    assert!(verify_signature(&tx, signature.as_ref(), &public_key));
+    assert!(is_signature_valid(signature.as_ref(), &public_key));
 
         // Test with wrong transaction
         let wrong_tx = Transaction {
@@ -485,9 +497,9 @@ mod tests {
         assert!(!is_signature_valid(&invalid_sig, &public_key));
 
         // Test with bad v (length 65 but v=2)
-        let mut bad_v = signature.clone();
-        bad_v[64] = 2u8; // invalid recovery id
-        assert!(!verify_signature(&tx, &bad_v, &public_key));
-        assert!(!is_signature_valid(&bad_v, &public_key));
+    let mut bad_v = <zeroize::Zeroizing<Vec<u8>> as AsRef<[u8]>>::as_ref(&signature).to_vec();
+    bad_v[64] = 2u8; // invalid recovery id
+    assert!(!verify_signature(&tx, &bad_v, &public_key));
+    assert!(!is_signature_valid(&bad_v, &public_key));
     }
 }

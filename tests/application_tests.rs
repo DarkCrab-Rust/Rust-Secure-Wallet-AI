@@ -21,7 +21,8 @@ async fn test_create_wallet_service() {
 
     assert!(result.is_ok());
     let wallet = result.unwrap();
-    assert_eq!(wallet.mnemonic(), mnemonic);
+    let mn = wallet.mnemonic_secret();
+    assert_eq!(mn.as_str(), mnemonic);
 }
 
 #[tokio::test]
