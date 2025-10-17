@@ -27,7 +27,7 @@ jobs:
           fetch-depth: 0
 
       - name: Setup Rust (stable) and add components
-        uses: dtolnay/rust-toolchain@stable
+        uses: actions-rs/toolchain@v1
         with:
           toolchain: stable
           components: rustfmt, clippy
