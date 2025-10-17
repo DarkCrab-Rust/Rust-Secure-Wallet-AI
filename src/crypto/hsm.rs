@@ -347,11 +347,11 @@ mod tests {
         let message = b"test message";
         let signature = hsm.secure_sign(key_id, message).await.unwrap();
 
-        // Verify signature is proper ECDSA format (64 bytes compact)
-        assert_eq!((&*signature).len(), 64, "ECDSA signature should be 64 bytes compact");
+    // Verify signature is proper ECDSA format (64 bytes compact)
+    assert_eq!(signature.len(), 64, "ECDSA signature should be 64 bytes compact");
 
-        // Verify signature is not just a hash (32 bytes)
-        assert_ne!((&*signature).len(), 32, "Signature should not be just a hash");
+    // Verify signature is not just a hash (32 bytes)
+    assert_ne!(signature.len(), 32, "Signature should not be just a hash");
 
         // Clean up
         hsm.free_secure_memory(key_id).await.unwrap();
