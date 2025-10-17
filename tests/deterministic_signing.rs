@@ -1,7 +1,7 @@
-use secp256k1::{Secp256k1, SecretKey, Message};
-use secp256k1::ecdsa::{Signature, RecoverableSignature};
-use ed25519_dalek::SigningKey as Ed25519SigningKey;
 use ed25519_dalek::Signer as _;
+use ed25519_dalek::SigningKey as Ed25519SigningKey;
+use secp256k1::ecdsa::{RecoverableSignature, Signature};
+use secp256k1::{Message, Secp256k1, SecretKey};
 
 #[test]
 fn test_secp256k1_ecdsa_deterministic() {
@@ -12,7 +12,11 @@ fn test_secp256k1_ecdsa_deterministic() {
     let sig1: Signature = secp.sign_ecdsa(&msg, &sk);
     let sig2: Signature = secp.sign_ecdsa(&msg, &sk);
 
-    assert_eq!(sig1.serialize_compact().to_vec(), sig2.serialize_compact().to_vec(), "secp256k1 ECDSA signatures must be deterministic for same key+msg");
+    assert_eq!(
+        sig1.serialize_compact().to_vec(),
+        sig2.serialize_compact().to_vec(),
+        "secp256k1 ECDSA signatures must be deterministic for same key+msg"
+    );
 }
 
 #[test]
@@ -42,5 +46,9 @@ fn test_ed25519_deterministic() {
     let sig1 = sk.sign(msg);
     let sig2 = sk.sign(msg);
 
-    assert_eq!(sig1.to_bytes().to_vec(), sig2.to_bytes().to_vec(), "ed25519 signatures must be deterministic");
+    assert_eq!(
+        sig1.to_bytes().to_vec(),
+        sig2.to_bytes().to_vec(),
+        "ed25519 signatures must be deterministic"
+    );
 }

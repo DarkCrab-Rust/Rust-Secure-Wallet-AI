@@ -12,7 +12,8 @@ fn test_transaction_signature_consistency() {
         "1000".to_string(),
         "ethereum".to_string(),
         1,
-    ).expect("propose");
+    )
+    .expect("propose");
 
     // Set nonce/chain and amount precision so signing is allowed
     ms.set_nonce_and_chain_id(&tx_id, 1u64, 1u64).expect("set nonce/chain");
@@ -29,5 +30,9 @@ fn test_transaction_signature_consistency() {
     let sig1 = secp.sign_ecdsa(&msg, &sk);
     let sig2 = secp.sign_ecdsa(&msg, &sk);
 
-    assert_eq!(sig1.serialize_compact().to_vec(), sig2.serialize_compact().to_vec(), "signatures must be deterministic for same input");
+    assert_eq!(
+        sig1.serialize_compact().to_vec(),
+        sig2.serialize_compact().to_vec(),
+        "signatures must be deterministic for same input"
+    );
 }

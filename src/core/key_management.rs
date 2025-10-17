@@ -354,7 +354,7 @@ mod tests {
     fn test_store_and_retrieve_key() {
         clear_all_keys();
         let key = generate_key().unwrap();
-    let id = store_key(&key, "test_wallet").unwrap();
+        let id = store_key(&key, "test_wallet").unwrap();
         let retrieved = retrieve_key(&id, "test_wallet").unwrap();
         assert_eq!(retrieved.as_slice(), key.as_slice());
     }
@@ -410,9 +410,13 @@ mod tests {
         let retrieved1 = handle1.join().unwrap();
         let retrieved2 = handle2.join().unwrap();
 
-    assert!(retrieved1.as_slice() == key1.as_slice() || retrieved2.as_slice() == key1.as_slice());
-    assert!(retrieved1.as_slice() == key2.as_slice() || retrieved2.as_slice() == key2.as_slice());
-    assert_ne!(retrieved1.as_slice(), retrieved2.as_slice());
+        assert!(
+            retrieved1.as_slice() == key1.as_slice() || retrieved2.as_slice() == key1.as_slice()
+        );
+        assert!(
+            retrieved1.as_slice() == key2.as_slice() || retrieved2.as_slice() == key2.as_slice()
+        );
+        assert_ne!(retrieved1.as_slice(), retrieved2.as_slice());
     }
 
     #[serial_test::serial]
@@ -422,7 +426,7 @@ mod tests {
         let keys =
             [generate_key().unwrap(), generate_key().unwrap(), generate_key().unwrap()].to_vec();
 
-    let ids: Vec<String> = keys.iter().map(|k| store_key(k, "test_wallet").unwrap()).collect();
+        let ids: Vec<String> = keys.iter().map(|k| store_key(k, "test_wallet").unwrap()).collect();
 
         for (i, id) in ids.iter().enumerate() {
             let retrieved = retrieve_key(id, "test_wallet").unwrap();
@@ -438,8 +442,8 @@ mod tests {
         let id = store_key(&key, "test_wallet").unwrap();
 
         // Verify key exists
-    let retrieved = retrieve_key(&id, "test_wallet").unwrap();
-    assert_eq!(key.as_slice(), retrieved.as_slice());
+        let retrieved = retrieve_key(&id, "test_wallet").unwrap();
+        assert_eq!(key.as_slice(), retrieved.as_slice());
 
         // Delete key
         delete_key(&id).unwrap();

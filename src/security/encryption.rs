@@ -49,7 +49,11 @@ impl WalletSecurity {
     }
 
     /// 瑙ｅ瘑鏁版嵁
-    pub fn decrypt(&mut self, data: &[u8], key_id: &str) -> Result<zeroize::Zeroizing<Vec<u8>>, WalletError> {
+    pub fn decrypt(
+        &mut self,
+        data: &[u8],
+        key_id: &str,
+    ) -> Result<zeroize::Zeroizing<Vec<u8>>, WalletError> {
         register_encryption_operation!("security_decrypt", EncryptionAlgorithm::Aes256Gcm, false);
         if data.len() < 12 {
             return Err(WalletError::DecryptionError("Data too short".to_string()));
@@ -71,7 +75,10 @@ impl WalletSecurity {
     }
 
     /// 鑾峰彇鎴栧垱寤哄瘑閽� (private helper)
-    fn get_or_create_key(&mut self, key_id: &str) -> Result<zeroize::Zeroizing<Vec<u8>>, WalletError> {
+    fn get_or_create_key(
+        &mut self,
+        key_id: &str,
+    ) -> Result<zeroize::Zeroizing<Vec<u8>>, WalletError> {
         if let Some(key) = self.keys.get(key_id) {
             Ok(key.clone())
         } else {
@@ -85,7 +92,11 @@ impl WalletSecurity {
     }
 
     /// 娲剧敓瀵嗛挜
-    pub fn derive_key(&self, password: &str, salt: &[u8]) -> Result<zeroize::Zeroizing<Vec<u8>>, WalletError> {
+    pub fn derive_key(
+        &self,
+        password: &str,
+        salt: &[u8],
+    ) -> Result<zeroize::Zeroizing<Vec<u8>>, WalletError> {
         register_encryption_operation!("security_derive_key", EncryptionAlgorithm::Argon2, false);
         if salt.len() < 8 {
             return Err(WalletError::KeyDerivationError(
@@ -176,9 +187,9 @@ impl WalletSecurity {
 
         let payload = Payload { msg: encrypted_data, aad };
 
-        let plaintext = cipher
-            .decrypt(nonce, payload)
-            .map_err(|_| WalletError::DecryptionError("Private key decryption failed".to_string()))?;
+        let plaintext = cipher.decrypt(nonce, payload).map_err(|_| {
+            WalletError::DecryptionError("Private key decryption failed".to_string())
+        })?;
 
         Ok(zeroize::Zeroizing::new(plaintext))
     }
@@ -219,7 +230,7 @@ mod tests {
         let encrypted = security.encrypt(data, "test_key").unwrap();
         let decrypted = security.decrypt(&encrypted, "test_key").unwrap();
 
-    assert_eq!(data, decrypted.as_slice());
+        assert_eq!(data, decrypted.as_slice());
     }
 
     #[test]
@@ -230,7 +241,7 @@ mod tests {
         let key1 = security.derive_key("password", salt).unwrap();
         let key2 = security.derive_key("password", salt).unwrap();
 
-    assert_eq!(key1.as_slice(), key2.as_slice());
+        assert_eq!(key1.as_slice(), key2.as_slice());
     }
 
     #[test]
@@ -239,7 +250,7 @@ mod tests {
         let plaintext = b"hello world";
         let ciphertext = security.encrypt(plaintext, "key1").unwrap();
         let decrypted = security.decrypt(&ciphertext, "key1").unwrap();
-    assert_eq!(decrypted.as_slice(), plaintext);
+        assert_eq!(decrypted.as_slice(), plaintext);
     }
 
     #[test]
@@ -269,7 +280,7 @@ mod tests {
         let data = b"Test data for encryption";
         let encrypted = security.encrypt(data, "test_key").unwrap();
         let decrypted = security.decrypt(&encrypted, "test_key").unwrap();
-    assert_eq!(data, decrypted.as_slice());
+        assert_eq!(data, decrypted.as_slice());
     }
 
     #[test]
@@ -278,7 +289,7 @@ mod tests {
         let data = b"";
         let encrypted = security.encrypt(data, "key").unwrap();
         let decrypted = security.decrypt(&encrypted, "key").unwrap();
-    assert_eq!(data, decrypted.as_slice());
+        assert_eq!(data, decrypted.as_slice());
     }
 
     #[test]

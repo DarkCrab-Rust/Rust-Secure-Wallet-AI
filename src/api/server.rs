@@ -21,8 +21,8 @@ use crate::core::errors::WalletError;
 use crate::core::validation::{validate_address, validate_amount};
 use crate::core::wallet_manager::WalletManager;
 use axum::error_handling::HandleErrorLayer;
-use tower::BoxError;
 use base64::Engine;
+use tower::BoxError;
 
 #[derive(Clone)]
 pub struct WalletServer {
@@ -66,9 +66,9 @@ impl WalletServer {
         std::env::set_var("BRIDGE_MOCK_FORCE_SUCCESS", "1");
         std::env::set_var("BRIDGE_MOCK", "1");
         std::env::set_var("ALLOW_BRIDGE_MOCKS", "1");
-    // Marker to indicate the test-only constructor was used so other
-    // modules can detect this state without relying on test-harness envs.
-    std::env::set_var("WALLET_TEST_CONSTRUCTOR", "1");
+        // Marker to indicate the test-only constructor was used so other
+        // modules can detect this state without relying on test-harness envs.
+        std::env::set_var("WALLET_TEST_CONSTRUCTOR", "1");
 
         // 移除强制设置 BRIDGE_MOCK_FORCE_SUCCESS/TEST_SKIP_DECRYPT，由各测试自行控制
         // apply test key before initializing internals so create_wallet() uses same key
@@ -78,7 +78,7 @@ impl WalletServer {
             tracing::info!("new_for_test: applied test master key fingerprint for tests");
         }
         // delegate to primary constructor which will create WalletManager etc.
-    let mut server = WalletServer::new(bind_addr, port, config, api_key).await?;
+        let mut server = WalletServer::new(bind_addr, port, config, api_key).await?;
         // Override rate limiter for tests to allow unlimited requests
         server.rate_limiter = Arc::new(RateLimiter::new(10000, Duration::from_secs(1)));
         Ok(server)
@@ -176,14 +176,17 @@ fn constant_time_eq_hash(a: &[u8], b: &[u8]) -> bool {
     ha.as_slice().ct_eq(hb.as_slice()).into()
 }
 
-async fn authenticate(headers: &HeaderMap, api_key: &Option<crate::security::SecretVec>) -> Result<(), StatusCode> {
+async fn authenticate(
+    headers: &HeaderMap,
+    api_key: &Option<crate::security::SecretVec>,
+) -> Result<(), StatusCode> {
     if let Some(expected) = api_key {
         if let Some(provided) = headers.get("Authorization") {
             let provided = provided.to_str().unwrap_or("");
             // Compare exact raw value (no Bearer prefix), trimming only outer whitespace as before.
             let pbytes = provided.trim().as_bytes();
             let ebytes = &**expected; // SecretVec derefs to Vec<u8>
-            // Constant-time regardless of length via digest compare
+                                      // Constant-time regardless of length via digest compare
             if constant_time_eq_hash(pbytes, ebytes) {
                 return Ok(());
             }
@@ -828,8 +831,8 @@ async fn backup_wallet(
         )
     })?;
 
-    use aes_gcm::{aead::Aead, Aes256Gcm};
     use aes_gcm::KeyInit;
+    use aes_gcm::{aead::Aead, Aes256Gcm};
     use rand::RngCore;
     use zeroize::Zeroizing;
 
@@ -875,7 +878,7 @@ async fn backup_wallet(
         version: "1".to_string(),
         alg: "AES-256-GCM".to_string(),
         kek_id: None,
-    nonce: base64::engine::general_purpose::STANDARD.encode(nonce_bytes),
+        nonce: base64::engine::general_purpose::STANDARD.encode(nonce_bytes),
         ciphertext: ct_b64,
         wallet: name.clone(),
     };

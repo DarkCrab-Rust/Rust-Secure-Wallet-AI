@@ -9,10 +9,10 @@ use base64::Engine; // for base64 engine decode
 
 use crate::core::errors::WalletError;
 use crate::core::wallet_info::{SecureWalletData, WalletInfo};
+use crate::security::secret::vec_to_secret;
+use crate::security::SecretVec;
 use crate::storage::WalletStorageTrait;
 use zeroize::Zeroize;
-use crate::security::{SecretVec};
-use crate::security::secret::vec_to_secret;
 
 // (ciphertext, salt, nonce) kept implicit in SecureWalletData fields
 
@@ -39,7 +39,8 @@ pub async fn create_wallet(
         // honoring TEST_SKIP_DECRYPT in production builds.
         let running_under_test_harness = std::env::var("RUST_TEST_THREADS").is_ok()
             || std::env::var("WALLET_TEST_CONSTRUCTOR").is_ok()
-            || std::env::var("WALLET_ENC_KEY").ok().as_deref() == Some("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=");
+            || std::env::var("WALLET_ENC_KEY").ok().as_deref()
+                == Some("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=");
         if cfg!(any(test, feature = "test-env")) || running_under_test_harness {
             // allowed in test builds or when running under cargo test
         } else {
@@ -176,14 +177,19 @@ async fn store_wallet_securely(
             // and allow it in that case.
             let running_under_test_harness = std::env::var("RUST_TEST_THREADS").is_ok()
                 || std::env::var("WALLET_TEST_CONSTRUCTOR").is_ok();
-            let is_known_test_b64 = b64_raw.trim() == "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
-            if cfg!(any(test, feature = "test-env")) || running_under_test_harness || is_known_test_b64 {
+            let is_known_test_b64 =
+                b64_raw.trim() == "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
+            if cfg!(any(test, feature = "test-env"))
+                || running_under_test_harness
+                || is_known_test_b64
+            {
                 // allowed in test builds or when using test constructor key
             } else {
                 if std::env::var("TEST_SKIP_DECRYPT").is_ok() {
                     raw.zeroize();
                     return Err(WalletError::CryptoError(
-                        "TEST_SKIP_DECRYPT set at runtime but binary not built with `test-env`".into(),
+                        "TEST_SKIP_DECRYPT set at runtime but binary not built with `test-env`"
+                            .into(),
                     ));
                 }
                 raw.zeroize();

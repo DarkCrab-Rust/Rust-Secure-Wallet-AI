@@ -156,9 +156,9 @@ async fn eth_bip32_parity_fixed_vectors() {
     let seeds = vec![[0u8; 32], [0x11u8; 32]];
 
     for seed in seeds {
-    // Our derived private key (as bytes)
-    let our_priv = wm.test_derive_private_key(&seed, "eth").expect("derive priv");
-    let our_priv = our_priv.to_vec();
+        // Our derived private key (as bytes)
+        let our_priv = wm.test_derive_private_key(&seed, "eth").expect("derive priv");
+        let our_priv = our_priv.to_vec();
 
         // Build library XPriv and derive the same BIP44 path: m/44'/60'/0'/0/0
         let mut xprv = XPriv::root_from_seed(&seed, None).expect("root from seed");
@@ -174,8 +174,8 @@ async fn eth_bip32_parity_fixed_vectors() {
             <XPriv as AsRef<k256::ecdsa::SigningKey>>::as_ref(&xprv).clone();
         let lib_bytes = derived_signing.to_bytes();
 
-    // Compare
-    assert_eq!(our_priv.len(), lib_bytes.len());
-    assert_eq!(our_priv, lib_bytes.to_vec());
+        // Compare
+        assert_eq!(our_priv.len(), lib_bytes.len());
+        assert_eq!(our_priv, lib_bytes.to_vec());
     }
 }

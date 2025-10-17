@@ -93,7 +93,8 @@ async fn concurrent_send_advances_nonce_by_count() {
     wm.create_wallet("concurrent_send_test", true).await.expect("create wallet");
 
     // Derive the from_address from the injected test master key
-    let from_address = WalletManager::derive_address(&wm, &secret_master, "eth").expect("derive address");
+    let from_address =
+        WalletManager::derive_address(&wm, &secret_master, "eth").expect("derive address");
 
     let concurrency = 8usize;
     let mut handles: Vec<tokio::task::JoinHandle<String>> = Vec::new();

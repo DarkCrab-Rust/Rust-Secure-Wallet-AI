@@ -1,15 +1,15 @@
 // src/crypto/hsm.rs
+use crate::crypto::signature_utils::ensure_low_s;
+use crate::security::secret::{vec_to_secret, SecretVec};
 use anyhow::Result;
 use chrono::{DateTime, Utc};
 use rand::{rngs::OsRng, RngCore};
 use secp256k1::{Message, Secp256k1, SecretKey};
 use sha2::{Digest, Sha256};
-use crate::crypto::signature_utils::ensure_low_s;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 use tracing::{debug, info, warn};
 use zeroize::{Zeroize, ZeroizeOnDrop, Zeroizing};
-use crate::security::secret::{SecretVec, vec_to_secret};
 
 #[derive(Clone)]
 pub struct HSMConfig {
@@ -208,16 +208,16 @@ impl HSMManager {
         let message_obj = Message::from_slice(&message_hash)
             .map_err(|e| anyhow::anyhow!("Invalid message hash: {}", e))?;
 
-    // Sign the message
-    let signature = secp.sign_ecdsa(&message_obj, &keypair.secret_key());
+        // Sign the message
+        let signature = secp.sign_ecdsa(&message_obj, &keypair.secret_key());
 
-    // Normalize to low-S to prevent malleability and ensure canonicality
-    let mut compact = [0u8; 64];
-    compact.copy_from_slice(&signature.serialize_compact());
-    let normalized = ensure_low_s(&compact);
+        // Normalize to low-S to prevent malleability and ensure canonicality
+        let mut compact = [0u8; 64];
+        compact.copy_from_slice(&signature.serialize_compact());
+        let normalized = ensure_low_s(&compact);
 
-    debug!("Message signed with secure ECDSA key (low-S normalized)");
-    Ok(vec_to_secret(normalized.to_vec()))
+        debug!("Message signed with secure ECDSA key (low-S normalized)");
+        Ok(vec_to_secret(normalized.to_vec()))
     }
 
     pub async fn get_memory_stats(&self) -> Result<HSMMemoryStats> {
@@ -343,15 +343,15 @@ mod tests {
         let key_id = hsm.secure_key_generation("ECDSA", 32).await.unwrap();
         assert!(key_id > 0);
 
-    // Sign with the key
-    let message = b"test message";
-    let signature = hsm.secure_sign(key_id, message).await.unwrap();
+        // Sign with the key
+        let message = b"test message";
+        let signature = hsm.secure_sign(key_id, message).await.unwrap();
 
-    // Verify signature is proper ECDSA format (64 bytes compact)
-    assert_eq!((&*signature).len(), 64, "ECDSA signature should be 64 bytes compact");
+        // Verify signature is proper ECDSA format (64 bytes compact)
+        assert_eq!((&*signature).len(), 64, "ECDSA signature should be 64 bytes compact");
 
-    // Verify signature is not just a hash (32 bytes)
-    assert_ne!((&*signature).len(), 32, "Signature should not be just a hash");
+        // Verify signature is not just a hash (32 bytes)
+        assert_ne!((&*signature).len(), 32, "Signature should not be just a hash");
 
         // Clean up
         hsm.free_secure_memory(key_id).await.unwrap();

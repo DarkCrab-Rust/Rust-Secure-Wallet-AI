@@ -1,14 +1,14 @@
 use anyhow::Context;
+use atty::Stream;
 use clap::Parser;
 use defi_hot_wallet::cli::{Cli, Commands};
 use defi_hot_wallet::core::config::WalletConfig;
 use defi_hot_wallet::core::WalletManager;
+use defi_hot_wallet::security::SecretVec;
 use serde_json::Value;
 use std::collections::HashMap;
-use tokio::fs;
 use std::io::{self, Write};
-use atty::Stream;
-use defi_hot_wallet::security::SecretVec;
+use tokio::fs;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -61,12 +61,15 @@ async fn main() -> anyhow::Result<()> {
             //    file path specified by MNEMONIC_EXPORT_PATH (defaults to ./mnemonic.enc).
             // These measures reduce accidental secret leakage.
 
-            let allow_mnemonic = std::env::var("ALLOW_PLAINTEXT_MNEMONIC").ok().as_deref() == Some("1");
-            let confirm_mnemonic = std::env::var("ALLOW_PLAINTEXT_MNEMONIC_CONFIRM").ok().as_deref() == Some("1");
+            let allow_mnemonic =
+                std::env::var("ALLOW_PLAINTEXT_MNEMONIC").ok().as_deref() == Some("1");
+            let confirm_mnemonic =
+                std::env::var("ALLOW_PLAINTEXT_MNEMONIC_CONFIRM").ok().as_deref() == Some("1");
 
             if allow_mnemonic && confirm_mnemonic {
                 // Allow tests to bypass interactive TTY checks and the prompt by setting the WALLET_TEST_CONSTRUCTOR marker.
-                let test_ctor = std::env::var("WALLET_TEST_CONSTRUCTOR").ok().as_deref() == Some("1");
+                let test_ctor =
+                    std::env::var("WALLET_TEST_CONSTRUCTOR").ok().as_deref() == Some("1");
                 if test_ctor {
                     // In test harnesses, print directly and avoid prompting for interactive input.
                     if let Ok(s) = std::str::from_utf8(mnemonic.as_slice()) {
@@ -74,7 +77,10 @@ async fn main() -> anyhow::Result<()> {
                     } else {
                         println!("<invalid-utf8-mnemonic>");
                     }
-                    tracing::info!(mnemonic = "<shown>", "Generated mnemonic displayed to stdout (test constructor bypass)");
+                    tracing::info!(
+                        mnemonic = "<shown>",
+                        "Generated mnemonic displayed to stdout (test constructor bypass)"
+                    );
                     return Ok(());
                 }
 
@@ -112,7 +118,8 @@ async fn main() -> anyhow::Result<()> {
             // Encrypted export path: if MNEMONIC_EXPORT_KEY is set (32-byte hex), encrypt and write.
             if let Ok(export_key_hex) = std::env::var("MNEMONIC_EXPORT_KEY") {
                 // Default path
-                let out_path = std::env::var("MNEMONIC_EXPORT_PATH").unwrap_or_else(|_| "./mnemonic.enc".to_string());
+                let out_path = std::env::var("MNEMONIC_EXPORT_PATH")
+                    .unwrap_or_else(|_| "./mnemonic.enc".to_string());
 
                 // Normalize hex like env_manager does
                 let mut key_hex = export_key_hex.trim().to_string();
@@ -121,21 +128,30 @@ async fn main() -> anyhow::Result<()> {
                 }
                 // Validate length (64 hex chars -> 32 bytes) and decode
                 if key_hex.len() != 64 {
-                    return Err(anyhow::anyhow!("MNEMONIC_EXPORT_KEY must be 64 hex chars (32 bytes)"));
+                    return Err(anyhow::anyhow!(
+                        "MNEMONIC_EXPORT_KEY must be 64 hex chars (32 bytes)"
+                    ));
                 }
 
                 let key_bytes_vec = match hex::decode(&key_hex) {
                     Ok(b) => b,
-                    Err(e) => return Err(anyhow::anyhow!("MNEMONIC_EXPORT_KEY contains invalid hex: {}", e)),
+                    Err(e) => {
+                        return Err(anyhow::anyhow!(
+                            "MNEMONIC_EXPORT_KEY contains invalid hex: {}",
+                            e
+                        ))
+                    }
                 };
 
                 if key_bytes_vec.len() != 32 {
-                    return Err(anyhow::anyhow!("MNEMONIC_EXPORT_KEY decoded length is not 32 bytes"));
+                    return Err(anyhow::anyhow!(
+                        "MNEMONIC_EXPORT_KEY decoded length is not 32 bytes"
+                    ));
                 }
 
                 // Zeroize the decoded key_bytes immediately and use it for encryption
-                use zeroize::Zeroizing;
                 use defi_hot_wallet::security::mnemonic_export;
+                use zeroize::Zeroizing;
 
                 let key_bytes = Zeroizing::new(key_bytes_vec);
                 let aad = out_path.as_bytes();
@@ -145,10 +161,11 @@ async fn main() -> anyhow::Result<()> {
                     &key_bytes,
                     aad,
                 )
-                    .map_err(|e| anyhow::anyhow!("Encryption failed: {}", e))?;
+                .map_err(|e| anyhow::anyhow!("Encryption failed: {}", e))?;
 
-                std::fs::write(&out_path, &blob)
-                    .map_err(|e| anyhow::anyhow!("Failed to write encrypted mnemonic to {}: {}", out_path, e))?;
+                std::fs::write(&out_path, &blob).map_err(|e| {
+                    anyhow::anyhow!("Failed to write encrypted mnemonic to {}: {}", out_path, e)
+                })?;
 
                 // Try to set restrictive permissions on unix-like systems (600).
                 #[cfg(unix)]
@@ -171,7 +188,10 @@ async fn main() -> anyhow::Result<()> {
                     tracing::warn!(path = %out_path, "Encrypted mnemonic exported; could not enforce POSIX 0o600 permissions on this platform. Secure the file manually.");
                 }
 
-                tracing::warn!("Encrypted mnemonic exported to {} (MNEMONIC_EXPORT_KEY used)", out_path);
+                tracing::warn!(
+                    "Encrypted mnemonic exported to {} (MNEMONIC_EXPORT_KEY used)",
+                    out_path
+                );
 
                 return Ok(());
             }

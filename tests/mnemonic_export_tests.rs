@@ -10,8 +10,10 @@ fn test_encrypt_decrypt_mnemonic_roundtrip() {
 
     let aad = b"/tmp/test_mnemonic.enc";
 
-    let blob = mnemonic_export::encrypt_mnemonic_to_bytes(mnemonic, &key_vec, aad).expect("encrypt");
-    let recovered_z = mnemonic_export::decrypt_mnemonic_from_bytes(&blob, &key_vec, aad).expect("decrypt");
+    let blob =
+        mnemonic_export::encrypt_mnemonic_to_bytes(mnemonic, &key_vec, aad).expect("encrypt");
+    let recovered_z =
+        mnemonic_export::decrypt_mnemonic_from_bytes(&blob, &key_vec, aad).expect("decrypt");
     let recovered = String::from_utf8(recovered_z.to_vec()).expect("utf8");
 
     assert_eq!(recovered, mnemonic);

@@ -485,9 +485,9 @@ mod tests {
         assert!(complete);
 
         // Execute transaction
-    let tx = multisig.execute_transaction("tx1").unwrap();
-    assert_eq!(tx.id, "tx1");
-    assert_eq!(tx.signature_count(), 2);
+        let tx = multisig.execute_transaction("tx1").unwrap();
+        assert_eq!(tx.id, "tx1");
+        assert_eq!(tx.signature_count(), 2);
     }
 
     #[test]
@@ -618,8 +618,8 @@ mod tests {
         let complete = ms.sign_transaction("tx_bind", &kp2.public_key(), &sig2).unwrap();
         assert!(complete);
 
-    let tx = ms.execute_transaction("tx_bind").unwrap();
-    assert_eq!(tx.signature_count(), 2);
+        let tx = ms.execute_transaction("tx_bind").unwrap();
+        assert_eq!(tx.signature_count(), 2);
     }
 
     #[test]

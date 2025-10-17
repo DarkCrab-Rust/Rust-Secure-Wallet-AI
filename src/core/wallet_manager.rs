@@ -11,7 +11,8 @@ use once_cell::sync::Lazy;
 static TEST_MASTER_KEYS: Lazy<Mutex<HashMap<String, crate::security::SecretVec>>> =
     Lazy::new(|| Mutex::new(HashMap::new()));
 
-static TEST_MASTER_DEFAULT: Lazy<Mutex<Option<crate::security::SecretVec>>> = Lazy::new(|| Mutex::new(None));
+static TEST_MASTER_DEFAULT: Lazy<Mutex<Option<crate::security::SecretVec>>> =
+    Lazy::new(|| Mutex::new(None));
 
 /// Inject a test master key for a specific wallet name (test helper).
 pub fn inject_test_master_key(name: &str, key: crate::security::SecretVec) {
@@ -53,8 +54,8 @@ use crate::core::validation::{validate_address, validate_amount};
 use crate::core::wallet::{backup, create, recover};
 use crate::core::wallet_info::{SecureWalletData, WalletInfo};
 use crate::crypto::{hsm::HSMManager, multisig::MultiSignature, quantum::QuantumSafeEncryption};
-use crate::storage::{WalletMetadata, WalletStorage, WalletStorageTrait};
 use crate::security::SecretVec;
+use crate::storage::{WalletMetadata, WalletStorage, WalletStorageTrait};
 
 use crate::crypto::encryption_consistency::EncryptionAlgorithm;
 use crate::register_encryption_operation;
@@ -1386,7 +1387,10 @@ impl WalletManager {
         Ok(vec![])
     }
 
-    pub async fn backup_wallet(&self, wallet_name: &str) -> Result<zeroize::Zeroizing<Vec<u8>>, WalletError> {
+    pub async fn backup_wallet(
+        &self,
+        wallet_name: &str,
+    ) -> Result<zeroize::Zeroizing<Vec<u8>>, WalletError> {
         // Propagate zeroizing buffer from core::wallet::backup
         backup::backup_wallet(&self.storage, wallet_name).await
     }
@@ -1435,7 +1439,10 @@ impl WalletManager {
 
     /// Compatibility helper: expose derive_master_key as a method on WalletManager.
     /// Delegates to the canonical implementation in `core::wallet::create`.
-    pub async fn derive_master_key(&self, mnemonic: &str) -> Result<crate::security::SecretVec, WalletError> {
+    pub async fn derive_master_key(
+        &self,
+        mnemonic: &str,
+    ) -> Result<crate::security::SecretVec, WalletError> {
         crate::core::wallet::create::derive_master_key(mnemonic).await
     }
 
@@ -1549,13 +1556,13 @@ mod bip44_eth_tests {
         let wm = WalletManager::new_with_storage(&cfg, storage, None).await.expect("wm init");
 
         // Inject a default test master key and ensure get_master_key_for_wallet returns it
-    let test_key = vec![0x42u8; 32];
-    let secret = crate::security::secret::vec_to_secret(test_key.clone());
-    set_test_master_key_default(secret);
+        let test_key = vec![0x42u8; 32];
+        let secret = crate::security::secret::vec_to_secret(test_key.clone());
+        set_test_master_key_default(secret);
 
-    // Call the private helper via the instance (allowed in same-module tests)
-    let got = wm.get_master_key_for_wallet("any_name").expect("get master key");
-    assert_eq!(&*got, &test_key[..]);
+        // Call the private helper via the instance (allowed in same-module tests)
+        let got = wm.get_master_key_for_wallet("any_name").expect("get master key");
+        assert_eq!(&*got, &test_key[..]);
     }
 
     #[tokio::test]

@@ -34,7 +34,8 @@ pub async fn recover_wallet(
         // honor TEST_SKIP_DECRYPT in production binaries.
         let running_under_test_harness = std::env::var("RUST_TEST_THREADS").is_ok()
             || std::env::var("WALLET_TEST_CONSTRUCTOR").is_ok()
-            || std::env::var("WALLET_ENC_KEY").ok().as_deref() == Some("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=");
+            || std::env::var("WALLET_ENC_KEY").ok().as_deref()
+                == Some("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=");
         if cfg!(any(test, feature = "test-env")) || running_under_test_harness {
             // allowed in test builds or when running under cargo test
         } else {
@@ -105,8 +106,6 @@ pub async fn recover_wallet(
     Ok(())
 }
 
-
-
 async fn store_wallet_securely(
     storage: &Arc<dyn WalletStorageTrait + Send + Sync>,
     quantum_crypto: &crate::crypto::quantum::QuantumSafeEncryption,
@@ -145,14 +144,19 @@ async fn store_wallet_securely(
         if raw.iter().all(|&b| b == 0) {
             let running_under_test_harness = std::env::var("RUST_TEST_THREADS").is_ok()
                 || std::env::var("WALLET_TEST_CONSTRUCTOR").is_ok();
-            let is_known_test_b64 = b64_raw.trim() == "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
-            if cfg!(any(test, feature = "test-env")) || running_under_test_harness || is_known_test_b64 {
+            let is_known_test_b64 =
+                b64_raw.trim() == "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
+            if cfg!(any(test, feature = "test-env"))
+                || running_under_test_harness
+                || is_known_test_b64
+            {
                 // allowed in test builds or when using test constructor key
             } else {
                 if std::env::var("TEST_SKIP_DECRYPT").is_ok() {
                     raw.zeroize();
                     return Err(WalletError::CryptoError(
-                        "TEST_SKIP_DECRYPT set at runtime but binary not built with `test-env`".into(),
+                        "TEST_SKIP_DECRYPT set at runtime but binary not built with `test-env`"
+                            .into(),
                     ));
                 }
                 raw.zeroize();

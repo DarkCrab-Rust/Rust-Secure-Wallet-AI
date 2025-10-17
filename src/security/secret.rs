@@ -8,4 +8,3 @@ pub type SecretVec = Zeroizing<Vec<u8>>;
 pub fn vec_to_secret(v: Vec<u8>) -> SecretVec {
     Zeroizing::new(v)
 }
-

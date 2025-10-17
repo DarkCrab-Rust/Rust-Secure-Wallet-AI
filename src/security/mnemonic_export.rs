@@ -1,11 +1,15 @@
-use aes_gcm::{aead::Aead, Aes256Gcm};
 use aes_gcm::KeyInit;
+use aes_gcm::{aead::Aead, Aes256Gcm};
 use rand::RngCore;
 use zeroize::Zeroizing;
 
 /// Encrypts a mnemonic using AES-256-GCM and returns the bytes to write to disk
 /// Format: 12-byte nonce || ciphertext
-pub fn encrypt_mnemonic_to_bytes(mnemonic: &str, key_bytes: &[u8], aad: &[u8]) -> Result<Vec<u8>, String> {
+pub fn encrypt_mnemonic_to_bytes(
+    mnemonic: &str,
+    key_bytes: &[u8],
+    aad: &[u8],
+) -> Result<Vec<u8>, String> {
     if key_bytes.len() != 32 {
         return Err("Encryption key must be 32 bytes".to_string());
     }
@@ -35,7 +39,11 @@ pub fn encrypt_mnemonic_to_bytes(mnemonic: &str, key_bytes: &[u8], aad: &[u8]) -
 }
 
 /// Decrypts bytes produced by `encrypt_mnemonic_to_bytes` given the key and aad
-pub fn decrypt_mnemonic_from_bytes(blob: &[u8], key_bytes: &[u8], aad: &[u8]) -> Result<zeroize::Zeroizing<Vec<u8>>, String> {
+pub fn decrypt_mnemonic_from_bytes(
+    blob: &[u8],
+    key_bytes: &[u8],
+    aad: &[u8],
+) -> Result<zeroize::Zeroizing<Vec<u8>>, String> {
     if key_bytes.len() != 32 {
         return Err("Encryption key must be 32 bytes".to_string());
     }

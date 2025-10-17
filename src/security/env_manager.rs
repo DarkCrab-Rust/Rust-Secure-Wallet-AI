@@ -488,7 +488,8 @@ pub mod secure_env {
 
     /// Get operator key for backups (sensitive) as zeroizing bytes
     pub fn get_wallet_backup_operator_key() -> Result<zeroize::Zeroizing<Vec<u8>>> {
-        let v = SECURE_ENV_MANAGER.get_string("WALLET_BACKUP_OPERATOR_KEY", PermissionLevel::Sensitive)?;
+        let v = SECURE_ENV_MANAGER
+            .get_string("WALLET_BACKUP_OPERATOR_KEY", PermissionLevel::Sensitive)?;
         Ok(zeroize::Zeroizing::new(v.into_bytes()))
     }
 
@@ -586,16 +587,16 @@ mod tests {
 
     #[test]
     fn test_hex_decoding_validation() {
-    // Set up a test environment variable with exactly 64 hex characters (32 bytes)
-    let hex_value = "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef";
-    let _guard = TEST_ENV_LOCK.lock().unwrap();
-    env::set_var("WALLET_MASTER_KEY", hex_value);
+        // Set up a test environment variable with exactly 64 hex characters (32 bytes)
+        let hex_value = "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef";
+        let _guard = TEST_ENV_LOCK.lock().unwrap();
+        env::set_var("WALLET_MASTER_KEY", hex_value);
 
-    let manager = SecureEnvManager::new();
-    let result = manager.get_bytes("WALLET_MASTER_KEY", PermissionLevel::Critical);
+        let manager = SecureEnvManager::new();
+        let result = manager.get_bytes("WALLET_MASTER_KEY", PermissionLevel::Critical);
 
-    // Clean up
-    env::remove_var("WALLET_MASTER_KEY");
+        // Clean up
+        env::remove_var("WALLET_MASTER_KEY");
 
         // Debug: print the result for troubleshooting (use tracing to avoid stderr leaks)
         if let Err(ref e) = result {
@@ -609,15 +610,15 @@ mod tests {
 
     #[test]
     fn test_invalid_hex_format() {
-    // Set up invalid hex
-    let _guard = TEST_ENV_LOCK.lock().unwrap();
-    env::set_var("WALLET_MASTER_KEY", "invalid_hex_value");
+        // Set up invalid hex
+        let _guard = TEST_ENV_LOCK.lock().unwrap();
+        env::set_var("WALLET_MASTER_KEY", "invalid_hex_value");
 
-    let manager = SecureEnvManager::new();
-    let result = manager.get_bytes("WALLET_MASTER_KEY", PermissionLevel::Critical);
+        let manager = SecureEnvManager::new();
+        let result = manager.get_bytes("WALLET_MASTER_KEY", PermissionLevel::Critical);
 
-    // Clean up
-    env::remove_var("WALLET_MASTER_KEY");
+        // Clean up
+        env::remove_var("WALLET_MASTER_KEY");
 
         assert!(result.is_err());
         let error_msg = result.unwrap_err().to_string();
@@ -651,12 +652,12 @@ mod tests {
     fn test_cache_operations() {
         let manager = SecureEnvManager::new();
 
-    // Set up a test variable
-    let _guard = TEST_ENV_LOCK.lock().unwrap();
-    env::set_var("DATABASE_URL", "sqlite://test.db");
+        // Set up a test variable
+        let _guard = TEST_ENV_LOCK.lock().unwrap();
+        env::set_var("DATABASE_URL", "sqlite://test.db");
 
-    // First access should work
-    let result1 = manager.get_string("DATABASE_URL", PermissionLevel::Internal);
+        // First access should work
+        let result1 = manager.get_string("DATABASE_URL", PermissionLevel::Internal);
         assert!(result1.is_ok());
 
         // Second access should also work (may use cache)
@@ -668,8 +669,8 @@ mod tests {
         let clear_result = manager.clear_cache("DATABASE_URL");
         assert!(clear_result.is_ok());
 
-    // Clean up
-    env::remove_var("DATABASE_URL");
+        // Clean up
+        env::remove_var("DATABASE_URL");
     }
 
     #[test]

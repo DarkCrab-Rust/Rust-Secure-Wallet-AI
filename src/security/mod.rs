@@ -9,9 +9,9 @@ pub mod compliance;
 pub mod encryption;
 pub mod env_manager;
 pub mod memory_protection;
-pub mod shamir;
 pub mod mnemonic_export;
 pub mod secret;
+pub mod shamir;
 
 // Add the new anti-debug module
 pub mod anti_debug;

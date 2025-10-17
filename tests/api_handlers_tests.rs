@@ -169,7 +169,9 @@ async fn test_bridge_wallet_lifecycle_and_success() {
 #[tokio::test(flavor = "current_thread")]
 async fn test_bridge_unauthorized_when_api_key_set() {
     // create server with an API key set -> requests without Authorization should 401
-    let server = setup_test_server_with_key(Some(zeroize::Zeroizing::new("secret-key".as_bytes().to_vec()))).await;
+    let server =
+        setup_test_server_with_key(Some(zeroize::Zeroizing::new("secret-key".as_bytes().to_vec())))
+            .await;
 
     let req = BridgeAssetsRequest {
         from_wallet: "any".to_string(),

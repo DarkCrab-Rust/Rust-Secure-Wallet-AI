@@ -17,4 +17,3 @@ pub async fn backup_wallet(
         .map_err(|e| WalletError::MnemonicError(e.to_string()))?;
     Ok(mnemonic_z)
 }
-

@@ -6,9 +6,8 @@ use defi_hot_wallet::security::SecretVec;
 async fn test_derive_master_key_returns_secretvec() {
     // Known mnemonic (BIP39 test vector)
     let mnemonic = "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about";
-    let key: SecretVec = create::derive_master_key(mnemonic)
-        .await
-        .expect("derive_master_key should succeed");
+    let key: SecretVec =
+        create::derive_master_key(mnemonic).await.expect("derive_master_key should succeed");
 
     // SecretVec is a Zeroizing<Vec<u8>> alias; ensure length is 32
     assert_eq!(key.len(), 32);

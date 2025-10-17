@@ -34,7 +34,12 @@ impl KeyDerivation {
         Self::new(KDFAlgorithm::HKDF)
     }
 
-    pub fn derive_key(&self, password: &[u8], salt: &[u8], key_length: usize) -> Result<Zeroizing<Vec<u8>>> {
+    pub fn derive_key(
+        &self,
+        password: &[u8],
+        salt: &[u8],
+        key_length: usize,
+    ) -> Result<Zeroizing<Vec<u8>>> {
         debug!("Deriving key with length {} bytes", key_length);
 
         match &self.algorithm {
@@ -57,8 +62,8 @@ impl KeyDerivation {
     ) -> Result<Zeroizing<Vec<u8>>> {
         debug!("Using PBKDF2 with {} iterations", iterations);
 
-    let mut key = Zeroizing::new(vec![0u8; key_length]);
-    pbkdf2_hmac::<Sha256>(password, salt, iterations, &mut key);
+        let mut key = Zeroizing::new(vec![0u8; key_length]);
+        pbkdf2_hmac::<Sha256>(password, salt, iterations, &mut key);
 
         debug!("鉁?PBKDF2 key derived successfully");
         Ok(key)
@@ -78,8 +83,8 @@ impl KeyDerivation {
         let params = Params::new((n as f64).log2() as u8, r, p, key_length)
             .map_err(|e| anyhow::anyhow!("Invalid Scrypt parameters: {}", e))?;
 
-    let mut key = Zeroizing::new(vec![0u8; key_length]);
-    scrypt::scrypt(password, salt, &params, &mut key)
+        let mut key = Zeroizing::new(vec![0u8; key_length]);
+        scrypt::scrypt(password, salt, &params, &mut key)
             .map_err(|e| anyhow::anyhow!("Scrypt derivation failed: {}", e))?;
 
         debug!("鉁?Scrypt key derived successfully");
@@ -95,9 +100,9 @@ impl KeyDerivation {
         debug!("Using HKDF key derivation");
 
         let hk = Hkdf::<Sha256>::new(Some(salt), input_key_material);
-    let mut key = Zeroizing::new(vec![0u8; key_length]);
+        let mut key = Zeroizing::new(vec![0u8; key_length]);
 
-    hk.expand(b"defi-wallet-key", &mut key)
+        hk.expand(b"defi-wallet-key", &mut key)
             .map_err(|e| anyhow::anyhow!("HKDF expansion failed: {}", e))?;
 
         debug!("鉁?HKDF key derived successfully");

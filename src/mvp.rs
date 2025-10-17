@@ -1,3 +1,4 @@
+use crate::security::SecretVec;
 use anyhow;
 use lazy_static::lazy_static;
 use secp256k1::{Message, Secp256k1, SecretKey};
@@ -7,7 +8,6 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Mutex;
 use zeroize::Zeroizing;
 use zeroize::{Zeroize, ZeroizeOnDrop};
-use crate::security::SecretVec;
 
 // 使用 lazy_static 初始化全局可变事务状态存储
 lazy_static! {
@@ -475,8 +475,8 @@ mod tests {
         assert_eq!(signature.len(), 65);
 
         // Verify the signature (signature is SecretVec - borrow as slice)
-    assert!(verify_signature(&tx, signature.as_ref(), &public_key));
-    assert!(is_signature_valid(signature.as_ref(), &public_key));
+        assert!(verify_signature(&tx, signature.as_ref(), &public_key));
+        assert!(is_signature_valid(signature.as_ref(), &public_key));
 
         // Test with wrong transaction
         let wrong_tx = Transaction {
@@ -497,9 +497,9 @@ mod tests {
         assert!(!is_signature_valid(&invalid_sig, &public_key));
 
         // Test with bad v (length 65 but v=2)
-    let mut bad_v = <zeroize::Zeroizing<Vec<u8>> as AsRef<[u8]>>::as_ref(&signature).to_vec();
-    bad_v[64] = 2u8; // invalid recovery id
-    assert!(!verify_signature(&tx, &bad_v, &public_key));
-    assert!(!is_signature_valid(&bad_v, &public_key));
+        let mut bad_v = <zeroize::Zeroizing<Vec<u8>> as AsRef<[u8]>>::as_ref(&signature).to_vec();
+        bad_v[64] = 2u8; // invalid recovery id
+        assert!(!verify_signature(&tx, &bad_v, &public_key));
+        assert!(!is_signature_valid(&bad_v, &public_key));
     }
 }

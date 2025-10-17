@@ -53,7 +53,11 @@ impl QuantumSafeEncryption {
         Ok(keypair)
     }
 
-    pub fn encrypt(&self, plaintext: &[u8], master_key: &[u8]) -> Result<zeroize::Zeroizing<Vec<u8>>> {
+    pub fn encrypt(
+        &self,
+        plaintext: &[u8],
+        master_key: &[u8],
+    ) -> Result<zeroize::Zeroizing<Vec<u8>>> {
         register_encryption_operation!("quantum_encrypt", EncryptionAlgorithm::QuantumSafe, true);
         debug!("Encrypting data with quantum-safe encryption (simulated)");
 
@@ -99,7 +103,11 @@ impl QuantumSafeEncryption {
         Ok(zeroize::Zeroizing::new(result))
     }
 
-    pub fn decrypt(&self, encrypted_data: &[u8], master_key: &[u8]) -> Result<zeroize::Zeroizing<Vec<u8>>> {
+    pub fn decrypt(
+        &self,
+        encrypted_data: &[u8],
+        master_key: &[u8],
+    ) -> Result<zeroize::Zeroizing<Vec<u8>>> {
         register_encryption_operation!("quantum_decrypt", EncryptionAlgorithm::QuantumSafe, true);
         debug!("Decrypting data with quantum-safe encryption (simulated)");
 

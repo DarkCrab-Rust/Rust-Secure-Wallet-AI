@@ -1,6 +1,6 @@
-use proptest::prelude::*;
-use defi_hot_wallet::shamir::{split_secret, combine_shares};
 use defi_hot_wallet::security::SecretVec;
+use defi_hot_wallet::shamir::{combine_shares, split_secret};
+use proptest::prelude::*;
 
 proptest! {
     #[test]

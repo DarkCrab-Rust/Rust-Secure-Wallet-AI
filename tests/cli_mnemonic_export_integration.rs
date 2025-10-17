@@ -1,5 +1,5 @@
-use std::process::Command;
 use std::fs;
+use std::process::Command;
 use tempfile::tempdir;
 
 #[test]
@@ -20,7 +20,11 @@ fn test_cli_encrypted_mnemonic_export_roundtrip() {
         .output()
         .expect("failed to run wallet-cli");
 
-    assert!(output.status.success(), "wallet-cli failed: {}", String::from_utf8_lossy(&output.stderr));
+    assert!(
+        output.status.success(),
+        "wallet-cli failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
 
     // Read the file and decrypt using the library helper
     let blob = fs::read(&out_path).expect("read export file");
@@ -29,7 +33,7 @@ fn test_cli_encrypted_mnemonic_export_roundtrip() {
     // we'll use the crate test helper function by compiling the library tests. For simplicity, re-derive
     // the decryption logic here (must match the library format: 12-byte nonce || ciphertext).
 
-    use aes_gcm::{Aes256Gcm, aead::Aead, KeyInit};
+    use aes_gcm::{aead::Aead, Aes256Gcm, KeyInit};
 
     // Construct cipher from raw key bytes (returns Result)
     let cipher = Aes256Gcm::new_from_slice(&key_bytes).expect("invalid key");
@@ -45,9 +49,7 @@ fn test_cli_encrypted_mnemonic_export_roundtrip() {
 
     use aes_gcm::aead::Payload;
     let aad = out_path.to_str().unwrap().as_bytes();
-    let plaintext = cipher
-        .decrypt(nonce, Payload { msg: ciphertext, aad })
-        .expect("decrypt");
+    let plaintext = cipher.decrypt(nonce, Payload { msg: ciphertext, aad }).expect("decrypt");
     let mnemonic = String::from_utf8(plaintext).expect("utf8");
 
     // Expect the test mnemonic (same as in cli code)

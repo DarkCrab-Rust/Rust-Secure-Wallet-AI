@@ -49,8 +49,8 @@
 //! let recovered = combine_shares(&subset).unwrap(); // Zeroizing<Vec<u8>> (zeroized on drop)
 //! assert_eq!(recovered.as_slice(), secret.as_slice());
 //! ```
-use rand::Rng;
 use crate::security::SecretVec;
+use rand::Rng;
 use std::num::NonZeroU8;
 
 /// Shamir 错误类型
@@ -308,16 +308,17 @@ mod tests {
         let secret = b"test secret data";
         let shares = split_secret(secret, 3, 5).unwrap();
         assert_eq!(shares.len(), 5);
-        let recovered = combine_shares(&[shares[0].clone(), shares[2].clone(), shares[4].clone()]).unwrap();
+        let recovered =
+            combine_shares(&[shares[0].clone(), shares[2].clone(), shares[4].clone()]).unwrap();
         // With the fix, we recover the original secret directly
-            assert_eq!(&*recovered, secret);
+        assert_eq!(&*recovered, secret);
     }
 
     #[test]
     fn test_insufficient_shares() {
         let secret = b"test";
-    let shares = split_secret(secret, 3, 5).unwrap();
-    assert!(combine_shares(&shares[..2]).is_err());
+        let shares = split_secret(secret, 3, 5).unwrap();
+        assert!(combine_shares(&shares[..2]).is_err());
     }
 
     #[test]
@@ -332,7 +333,7 @@ mod tests {
         assert_eq!(shares.len(), 1);
         assert_eq!(shares[0].as_slice().len(), 2 + secret.len());
         let recovered = combine_shares(&shares).unwrap();
-            assert_eq!(&*recovered, secret);
+        assert_eq!(&*recovered, secret);
     }
 
     // Additional tests
@@ -343,7 +344,7 @@ mod tests {
         let shares = split_secret(secret, 3, 5).unwrap();
         let subset = vec![shares[0].clone(), shares[1].clone(), shares[3].clone()];
         let recovered = combine_shares(&subset).unwrap();
-            assert_eq!(&*recovered, secret);
+        assert_eq!(&*recovered, secret);
     }
 
     #[test]
@@ -357,7 +358,7 @@ mod tests {
                 for k in (j + 1)..5 {
                     let subset = vec![shares[i].clone(), shares[j].clone(), shares[k].clone()];
                     let recovered = combine_shares(&subset).unwrap();
-                        assert_eq!(&*recovered, secret, "failed for combo {},{},{}", i, j, k);
+                    assert_eq!(&*recovered, secret, "failed for combo {},{},{}", i, j, k);
                 }
             }
         }
@@ -366,15 +367,15 @@ mod tests {
     #[test]
     fn test_duplicate_share_id_error() {
         let secret = b"dup id test";
-    let mut shares = split_secret(secret, 3, 5).unwrap();
-    // duplicate the first share id into second share to trigger duplicate id error
-    // convert to mutable Vec<u8> to modify
-    let s0 = shares[0].as_slice().to_vec();
-    let mut s1 = shares[1].as_slice().to_vec();
-    s1[1] = s0[1];
-    shares[1] = SecretVec::new(s1);
-    shares[0] = SecretVec::new(s0);
-    let res = combine_shares(&shares[..3]);
+        let mut shares = split_secret(secret, 3, 5).unwrap();
+        // duplicate the first share id into second share to trigger duplicate id error
+        // convert to mutable Vec<u8> to modify
+        let s0 = shares[0].as_slice().to_vec();
+        let mut s1 = shares[1].as_slice().to_vec();
+        s1[1] = s0[1];
+        shares[1] = SecretVec::new(s1);
+        shares[0] = SecretVec::new(s0);
+        let res = combine_shares(&shares[..3]);
         assert!(matches!(res, Err(ShamirError::InvalidParameters(_))));
     }
 
@@ -395,13 +396,13 @@ mod tests {
     #[test]
     fn test_malformed_share_length_on_combine() {
         // Create a malformed share for threshold > 1 (wrong payload length)
-    let mut shares = split_secret(b"some secret", 2, 3).unwrap();
-    // Ensure we actually shorten the first share so it's malformed regardless of secret length
-    // Choose a small payload length (e.g. 5) to guarantee truncation for typical test secrets
-    let mut s0 = shares[0].as_slice().to_vec();
-    s0.truncate(2 + 5); // wrong length
-    shares[0] = SecretVec::new(s0);
-    let res = combine_shares(&shares);
+        let mut shares = split_secret(b"some secret", 2, 3).unwrap();
+        // Ensure we actually shorten the first share so it's malformed regardless of secret length
+        // Choose a small payload length (e.g. 5) to guarantee truncation for typical test secrets
+        let mut s0 = shares[0].as_slice().to_vec();
+        s0.truncate(2 + 5); // wrong length
+        shares[0] = SecretVec::new(s0);
+        let res = combine_shares(&shares);
         assert!(matches!(res, Err(ShamirError::InvalidParameters(_))));
     }
 }

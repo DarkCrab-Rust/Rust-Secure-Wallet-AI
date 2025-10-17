@@ -184,13 +184,14 @@ where
         info!("Sending {} ETH to {}", amount, to);
 
         // Create wallet from private key using scoped secret access
-        let wallet = private_key.with_secret(|pk_bytes| self.create_wallet_from_private_key(pk_bytes))
+        let wallet = private_key
+            .with_secret(|pk_bytes| self.create_wallet_from_private_key(pk_bytes))
             .map_err(|e| {
-            WalletError::KeyDerivationError(format!(
-                "Failed to create wallet from private key: {}",
-                e
-            ))
-        })?;
+                WalletError::KeyDerivationError(format!(
+                    "Failed to create wallet from private key: {}",
+                    e
+                ))
+            })?;
 
         // Parse addresses and amount
         let to_address = Address::from_str(to)
@@ -247,13 +248,14 @@ where
         info!("Sending {} ETH to {} (nonce override: {:?})", amount, to, nonce);
 
         // Create wallet from private key using scoped secret access
-        let wallet = private_key.with_secret(|pk_bytes| self.create_wallet_from_private_key(pk_bytes))
+        let wallet = private_key
+            .with_secret(|pk_bytes| self.create_wallet_from_private_key(pk_bytes))
             .map_err(|e| {
-            WalletError::KeyDerivationError(format!(
-                "Failed to create wallet from private key: {}",
-                e
-            ))
-        })?;
+                WalletError::KeyDerivationError(format!(
+                    "Failed to create wallet from private key: {}",
+                    e
+                ))
+            })?;
 
         // Parse addresses and amount
         let to_address = Address::from_str(to)
