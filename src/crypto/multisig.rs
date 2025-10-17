@@ -26,7 +26,7 @@ pub struct MultiSigTransaction {
     pub to_address: String,
     pub amount: String,
     pub network: String,
-    pub signatures: HashMap<String, (PublicKey, Signature)>, // signer_id -> (pubkey, signature)
+    signatures: HashMap<String, (PublicKey, Signature)>, // signer_id -> (pubkey, signature)
     pub threshold: u8,
     pub created_at: chrono::DateTime<chrono::Utc>,
     // Optional policy binding to prevent signer-set substitution
@@ -34,6 +34,26 @@ pub struct MultiSigTransaction {
     pub nonce: Option<u64>,
     pub chain_id: Option<u64>,
     pub amount_precision: AmountPrecision,
+}
+
+impl MultiSigTransaction {
+    /// Return the number of collected signatures for this transaction.
+    pub fn signature_count(&self) -> usize {
+        self.signatures.len()
+    }
+
+    /// Return a vector of hex-encoded signatures paired with signer pubkey hex.
+    /// This avoids exposing raw owned byte buffers and provides a safe view for external callers.
+    pub fn signatures_hex(&self) -> Vec<(String, String)> {
+        self.signatures
+            .iter()
+            .map(|(signer_id, (_pk, sig))| {
+                // Serialize signature to compact (64 bytes) then hex
+                let compact = sig.serialize_compact();
+                (signer_id.clone(), hex::encode(compact))
+            })
+            .collect()
+    }
 }
 
 pub struct MultiSignature {
@@ -328,7 +348,7 @@ impl MultiSignature {
         }
         transaction.signatures.insert(signer_id, (*signer_pubkey, *signature));
 
-        let signatures_count = transaction.signatures.len() as u8;
+        let signatures_count = transaction.signature_count() as u8;
         let is_complete = signatures_count >= transaction.threshold;
 
         if is_complete {
@@ -352,8 +372,8 @@ impl MultiSignature {
             .remove(tx_id)
             .ok_or_else(|| anyhow::anyhow!("Transaction not found: {}", tx_id))?;
 
-        let signatures_count = transaction.signatures.len();
-        if (signatures_count as u8) < transaction.threshold {
+        let signatures_count = transaction.signature_count() as u8;
+        if signatures_count < transaction.threshold {
             // Put it back since it's not ready
             let threshold = transaction.threshold;
             self.pending_transactions.insert(tx_id.to_string(), transaction);
@@ -465,9 +485,9 @@ mod tests {
         assert!(complete);
 
         // Execute transaction
-        let tx = multisig.execute_transaction("tx1").unwrap();
-        assert_eq!(tx.id, "tx1");
-        assert_eq!(tx.signatures.len(), 2);
+    let tx = multisig.execute_transaction("tx1").unwrap();
+    assert_eq!(tx.id, "tx1");
+    assert_eq!(tx.signature_count(), 2);
     }
 
     #[test]
@@ -598,8 +618,8 @@ mod tests {
         let complete = ms.sign_transaction("tx_bind", &kp2.public_key(), &sig2).unwrap();
         assert!(complete);
 
-        let tx = ms.execute_transaction("tx_bind").unwrap();
-        assert_eq!(tx.signatures.len(), 2);
+    let tx = ms.execute_transaction("tx_bind").unwrap();
+    assert_eq!(tx.signature_count(), 2);
     }
 
     #[test]

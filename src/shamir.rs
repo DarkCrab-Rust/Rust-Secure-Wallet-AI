@@ -193,7 +193,7 @@ pub fn split_secret(
 /// Combine shares and recover secret material.
 /// - If threshold == 1 returns raw payload bytes
 /// - If threshold > 1 expects shares to be [threshold, id, 32-byte payload] and returns 32-byte secret (sha256(secret))
-pub fn combine_shares(shares: &[SecretVec]) -> Result<zeroize::Zeroizing<Vec<u8>>, ShamirError> {
+pub fn combine_shares(shares: &[SecretVec]) -> Result<SecretVec, ShamirError> {
     if shares.is_empty() {
         return Err(ShamirError::InvalidParameters("Shares cannot be empty".to_string()));
     }
@@ -234,7 +234,7 @@ pub fn combine_shares(shares: &[SecretVec]) -> Result<zeroize::Zeroizing<Vec<u8>
     // threshold == 1: return payload of first share
     if threshold == 1 {
         let payload = shares[0].as_slice()[2..].to_vec();
-        return Ok(zeroize::Zeroizing::new(payload));
+        return Ok(SecretVec::new(payload));
     }
 
     // determine payload length from first share and validate all shares have the same payload length
@@ -290,12 +290,12 @@ pub fn combine_shares(shares: &[SecretVec]) -> Result<zeroize::Zeroizing<Vec<u8>
         *secret_byte = acc;
     }
 
-        Ok(zeroize::Zeroizing::new(secret))
+    Ok(SecretVec::new(secret))
 }
 
 // API alias
 /// Alias for `combine_shares` to maintain API compatibility.
-pub fn combine_secret(shares: &[SecretVec]) -> Result<zeroize::Zeroizing<Vec<u8>>, ShamirError> {
+pub fn combine_secret(shares: &[SecretVec]) -> Result<SecretVec, ShamirError> {
     combine_shares(shares)
 }
 
