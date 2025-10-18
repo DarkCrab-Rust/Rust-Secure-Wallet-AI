@@ -58,6 +58,8 @@ fi
 
 MAX_ATTEMPTS=3
 SLEEP_POLL=8
+LAST_AUTOFIX_PR_URL=""
+LAST_AUTOFIX_BRANCH=""
 
 function do_local_fix() {
   echo "Running cargo fmt and cargo fix"
@@ -69,12 +71,58 @@ function do_local_fix() {
     git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
     git add -A
     git commit -m "chore(ci): auto-apply rustfmt/cargo-fix from CI autofix"
-    git push "https://x-access-token:${GITHUB_TOKEN}@github.com/${OWNER}/${REPO}.git" "HEAD:${BRANCH}"
-    return 0
+    if [ -z "${SKIP_API:-}" ]; then
+      # Create a new branch for the autofix and push it
+      NEW_BRANCH="autofix/${BRANCH}-${ORIG_RUN_ID}-${attempt}-$(date +%s)"
+      git checkout -b "$NEW_BRANCH"
+      git push "https://x-access-token:${GITHUB_TOKEN}@github.com/${OWNER}/${REPO}.git" "HEAD:${NEW_BRANCH}"
+      echo "Pushed fixes to ${NEW_BRANCH}"
+      LAST_AUTOFIX_BRANCH="$NEW_BRANCH"
+      return 0
+    else
+      git push "https://x-access-token:${GITHUB_TOKEN}@github.com/${OWNER}/${REPO}.git" "HEAD:${BRANCH}" || true
+      echo "Pushed fixes to ${BRANCH} (no-api mode)"
+      return 0
+    fi
   else
     echo "No local autofix changes"
     return 1
   fi
+}
+
+function create_pr_for_branch() {
+  local new_branch="$1"
+  local title="chore(ci): autofix suggestions (automated) for ${BRANCH} (run ${ORIG_RUN_ID})"
+  local body="Automated fixes applied by CI autofix script.\n\nBranch: ${new_branch}\nOriginal run: https://github.com/${OWNER}/${REPO}/actions/runs/${ORIG_RUN_ID}\nAttempt: ${attempt}\n\nPlease review the changes in this PR."
+  echo "Creating PR for branch ${new_branch} -> ${BRANCH}"
+  resp=$(curl -s -X POST -H "Authorization: token ${GITHUB_TOKEN}" -H "Accept: application/vnd.github+json" \
+    -d "{\"title\":\"${title}\",\"head\":\"${new_branch}\",\"base\":\"${BRANCH}\",\"body\":\"${body}\"}" \
+    "https://api.github.com/repos/${OWNER}/${REPO}/pulls")
+  PR_URL=$(echo "$resp" | jq -r .html_url)
+  if [ "$PR_URL" = "null" ] || [ -z "$PR_URL" ]; then
+    echo "Failed to create PR: $resp"
+    return 1
+  fi
+  echo "PR created: ${PR_URL}"
+  LAST_AUTOFIX_PR_URL="$PR_URL"
+  return 0
+}
+
+function create_issue_for_failure() {
+  local pr_url="${1:-}"
+  local title="CI autofix failed after ${MAX_ATTEMPTS} attempts for run ${ORIG_RUN_ID}"
+  local body="CI autofix attempted ${MAX_ATTEMPTS} times and the reruns did not succeed.\n\nBranch: ${BRANCH}\nOriginal run: https://github.com/${OWNER}/${REPO}/actions/runs/${ORIG_RUN_ID}\n"
+  if [ -n "$pr_url" ]; then
+    body+="A PR with the autofix changes was created: ${pr_url}\n\nPlease review the PR and apply manual fixes if necessary."
+  else
+    body+="No PR could be created automatically. Please investigate the failing run and apply fixes."
+  fi
+  echo "Creating issue to request human attention"
+  resp=$(curl -s -X POST -H "Authorization: token ${GITHUB_TOKEN}" -H "Accept: application/vnd.github+json" \
+    -d "{\"title\":\"${title}\",\"body\":\"${body}\"}" \
+    "https://api.github.com/repos/${OWNER}/${REPO}/issues")
+  ISSUE_URL=$(echo "$resp" | jq -r .html_url)
+  echo "Issue created: ${ISSUE_URL}"
 }
 
 function rerun_workflow() {
