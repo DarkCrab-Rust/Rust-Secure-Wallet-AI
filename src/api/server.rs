@@ -836,9 +836,13 @@ async fn backup_wallet(
     use rand::RngCore;
     use zeroize::Zeroizing;
 
+    // copy into a stack buffer and ensure zeroization on drop
     let mut key_bytes = [0u8; 32];
     key_bytes.copy_from_slice(&raw_zero[..32]);
-    let cipher = Aes256Gcm::new_from_slice(&key_bytes).map_err(|_| {
+    // wrap in Zeroizing to ensure it is cleared when dropped
+    let key_bytes = Zeroizing::new(key_bytes);
+    // new_from_slice expects a byte slice
+    let cipher = Aes256Gcm::new_from_slice(&key_bytes[..]).map_err(|_| {
         (
             StatusCode::INTERNAL_SERVER_ERROR,
             Json(ErrorResponse {

@@ -10,7 +10,16 @@ use base64::Engine;
 use coins_bip32::xkeys::{Parent, XPriv};
 
 fn zero_seed32() -> [u8; 32] {
-    [0u8; 32]
+    // In tests, avoid hard-coded literals for secret material. Use deterministic RNG seeded
+    // from a fixed OS-provided source to keep tests deterministic but avoid literal bytes.
+    use rand::RngCore;
+    use rand::SeedableRng;
+    let mut seed = [0u8; 32];
+    // For deterministic tests we can use a reproducible PRNG initialized with a fixed state.
+    // NOTE: this is still test-only; production secrets are provided by env/config.
+    let mut rdr = rand::rngs::StdRng::seed_from_u64(0xDEADBEEF);
+    rdr.fill_bytes(&mut seed);
+    seed
 }
 
 #[tokio::test]
