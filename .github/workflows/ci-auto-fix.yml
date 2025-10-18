@@ -44,9 +44,11 @@ jobs:
           # Optional: comma-separated labels to add to autofix PRs
           AUTOFIX_PR_LABELS: "autofix,ci"
           # Optional: comma-separated reviewers to request (usernames)
-          AUTOFIX_REQUEST_REVIEWERS: ""
+          # Default reviewer(s) for autofix PRs. Change to your GitHub username or team (comma-separated).
+          AUTOFIX_REQUEST_REVIEWERS: "Yinhang3377"
           # Optional: comma-separated assignees to add to the PR (usernames)
-          AUTOFIX_ASSIGNEES: ""
+          # Default assignee(s) for autofix PRs. Change to the security/CI lead or team handle.
+          AUTOFIX_ASSIGNEES: "Yinhang3377"
           # Optional: create an issue if all attempts fail
           AUTOFIX_OPEN_ISSUE_ON_FAIL: "true"
         run: |
