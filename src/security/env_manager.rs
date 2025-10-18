@@ -693,6 +693,8 @@ mod tests {
     fn test_hex_decoding_with_0x_and_whitespace() {
         // 0x-prefixed and whitespace-surrounded hex should decode correctly
         let hex_value = "  0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef  ";
+        // Serialize env mutation to avoid cross-test interference
+        let _guard = TEST_ENV_LOCK.lock().unwrap();
         std::env::set_var("WALLET_MASTER_KEY", hex_value);
 
         let manager = SecureEnvManager::new();
