@@ -1095,10 +1095,8 @@ impl WalletManager {
                         "Skipping rewrap_to_v2_and_update during test harness for {}",
                         wallet_data.info.name
                     );
-                } else {
-                    if let Err(e) = self.rewrap_to_v2_and_update(&mut wallet_data, &pt).await {
-                        warn!("Failed to rewrap wallet {} to AAD v2: {}", wallet_data.info.name, e);
-                    }
+                } else if let Err(e) = self.rewrap_to_v2_and_update(&mut wallet_data, &pt).await {
+                    warn!("Failed to rewrap wallet {} to AAD v2: {}", wallet_data.info.name, e);
                 }
             }
             pt
@@ -1187,10 +1185,8 @@ impl WalletManager {
                         "Skipping rewrap_to_v2_and_update during test harness for {}",
                         wallet_data.info.name
                     );
-                } else {
-                    if let Err(e) = self.rewrap_to_v2_and_update(&mut wallet_data, &pt).await {
-                        warn!("Failed to rewrap wallet {} to AAD v2: {}", wallet_data.info.name, e);
-                    }
+                } else if let Err(e) = self.rewrap_to_v2_and_update(&mut wallet_data, &pt).await {
+                    warn!("Failed to rewrap wallet {} to AAD v2: {}", wallet_data.info.name, e);
                 }
             }
             // pt is now Zeroizing<Vec<u8>> in both branches

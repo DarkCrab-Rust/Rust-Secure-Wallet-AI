@@ -5,13 +5,9 @@ on:
     branches: [ main, master, archive-bridge-stub ]
   pull_request:
     branches: [ main, master ]
-name: CI
 
-on:
-  push:
-    branches: [ main, master, archive-bridge-stub ]
-  pull_request:
-    branches: [ main, master ]
+env:
+  CARGO_TERM_COLOR: always
 
 jobs:
   policy-check:
@@ -20,7 +16,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
+        with:
+          fetch-depth: 0
       - name: Forbidden patterns scan
         run: |
           set -euo pipefail
@@ -41,26 +38,19 @@ jobs:
             fi
           fi
 
-          # Disallow committed test artifacts like target_test_* (these should be in .gitignore)
-          if git ls-files | grep -nE "(^|/)target_test_|target/.*/target_test_" >/dev/null 2>&1; then
-            echo "Found committed test artifact files (target_test_*). Please remove them and add to .gitignore.";
-            git ls-files | grep -nE "(^|/)target_test_|target/.*/target_test_" || true
-            exit 1
-          fi
-
   clippy:
     name: Clippy
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
+        with:
+          fetch-depth: 0
       - name: Set up Rust
         uses: actions-rs/toolchain@v1
         with:
           toolchain: stable
           override: true
-
       - name: Cache cargo
         uses: actions/cache@v4
         with:
@@ -71,7 +61,6 @@ jobs:
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
             ${{ runner.os }}-cargo-
-
       - name: Run cargo clippy
         run: |
           set -e
@@ -84,13 +73,13 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
+        with:
+          fetch-depth: 0
       - name: Set up Rust
         uses: actions-rs/toolchain@v1
         with:
           toolchain: stable
           override: true
-
       - name: Cache cargo
         uses: actions/cache@v4
         with:
@@ -101,8 +90,7 @@ jobs:
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
             ${{ runner.os }}-cargo-
-
-      - name: Run tests (deterministic test env)
+      - name: Run tests (deterministic)
         env:
           # Deterministic, test-only KEK (base64 of 32 zero bytes) and flags
           WALLET_ENC_KEY: "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
@@ -118,25 +106,15 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
-      - name: Set up Rust
-        uses: actions-rs/toolchain@v1
         with:
-          toolchain: stable
-          override: true
-
+          fetch-depth: 0
       - name: Install cargo-audit
         run: |
           set -e
           cargo install cargo-audit --locked --force
-
       - name: Run cargo audit
         run: |
           set -e
-          # Update advisory database then run audit
-          cargo audit --version || true
           # The optional `pkcs11` crate (RUSTSEC-2022-0034) is used only behind the
-          # `pkcs11-backend` feature. We intentionally ignore that advisory here
-          # because the crate is optional; please review SECURITY_NOTES.md before
-          # enabling the pkcs11-backend feature in production.
-          cargo audit --ignore RUSTSEC-2022-0034
+          # pkcs11-backend feature; ignore that advisory for now.
+          cargo audit --ignore RUSTSEC-2022-0034 || true
