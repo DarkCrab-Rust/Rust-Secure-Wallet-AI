@@ -5,6 +5,8 @@ on:
     branches: [ '**' ]
   pull_request:
     branches: [ '**' ]
+  # Allow manual runs from Actions UI and gh CLI
+  workflow_dispatch:
 
 jobs:
   build:

@@ -2,9 +2,11 @@ name: CI
 
 on:
   push:
-    branches: [ main, master ]
+    branches: [ main, master, security/secretvec-ci ]
   pull_request:
     branches: [ main, master ]
+  # Allow manual runs from the Actions tab and gh CLI
+  workflow_dispatch:
 
 jobs:
   clippy:
