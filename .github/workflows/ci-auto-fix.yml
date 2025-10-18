@@ -44,6 +44,8 @@ jobs:
           AUTOFIX_PR_LABELS: "autofix,ci"
           # Optional: comma-separated reviewers to request (usernames)
           AUTOFIX_REQUEST_REVIEWERS: ""
+          # Optional: comma-separated assignees to add to the PR (usernames)
+          AUTOFIX_ASSIGNEES: ""
           # Optional: create an issue if all attempts fail
           AUTOFIX_OPEN_ISSUE_ON_FAIL: "true"
         run: |

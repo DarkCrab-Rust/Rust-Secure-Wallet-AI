@@ -54,6 +54,8 @@ fi
 if [ -z "${SKIP_API:-}" ]; then
   ORIG_RUN_ID=$(jq -r .workflow_run.id < "$EVENT_FILE")
   WORKFLOW_ID=$(jq -r .workflow_run.workflow_id < "$EVENT_FILE")
+  # head commit sha for the run (used for commit comments so it shows on the run page)
+  HEAD_SHA=$(jq -r .workflow_run.head_sha < "$EVENT_FILE")
 fi
 
 MAX_ATTEMPTS=3
@@ -121,6 +123,22 @@ function create_pr_for_branch() {
     curl -s -X POST -H "Authorization: token ${GITHUB_TOKEN}" -H "Accept: application/vnd.github+json" \
       -d "${reviewers_json}" \
       "https://api.github.com/repos/${OWNER}/${REPO}/pulls/$(echo "$resp" | jq -r .number)/requested_reviewers"
+  fi
+  # Assign assignees if provided
+  if [ -n "${AUTOFIX_ASSIGNEES:-}" ]; then
+    echo "Assigning users: ${AUTOFIX_ASSIGNEES} to PR"
+    assignees_json=$(jq -nc --arg a "${AUTOFIX_ASSIGNEES}" '$a|split(",")')
+    curl -s -X POST -H "Authorization: token ${GITHUB_TOKEN}" -H "Accept: application/vnd.github+json" \
+      -d "{\"assignees\":${assignees_json}}" \
+      "https://api.github.com/repos/${OWNER}/${REPO}/issues/$(echo \"$resp\" | jq -r .number)/assignees"
+  fi
+  # Post a commit comment to the run's head commit so the CI run page shows the PR link
+  if [ -n "${HEAD_SHA:-}" ]; then
+    PR_NUMBER=$(echo "$resp" | jq -r .number)
+    commit_message="Automated autofix PR created: ${PR_URL}"
+    curl -s -X POST -H "Authorization: token ${GITHUB_TOKEN}" -H "Accept: application/vnd.github+json" \
+      -d "{\"body\":\"${commit_message}\"}" \
+      "https://api.github.com/repos/${OWNER}/${REPO}/commits/${HEAD_SHA}/comments"
   fi
   return 0
 }
