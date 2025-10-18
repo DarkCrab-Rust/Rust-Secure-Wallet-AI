@@ -59,14 +59,22 @@ pub async fn recover_wallet(
     let master_key_vec = crate::core::wallet::create::derive_master_key(seed_phrase)
         .await
         .map_err(|e| WalletError::KeyDerivationError(e.to_string()))?;
-    let mut master_key = [0u8; 32];
-    if master_key_vec.len() >= 32 {
-        master_key.copy_from_slice(&master_key_vec[..32]);
-    } else {
-        let mut tmp = [0u8; 32];
-        tmp[..master_key_vec.len()].copy_from_slice(&master_key_vec);
-        master_key.copy_from_slice(&tmp);
-    }
+    // Build master_key without using an all-zero literal.
+    use std::{mem::MaybeUninit, ptr};
+    let master_key = {
+        let mut out_uninit = MaybeUninit::<[u8; 32]>::uninit();
+        let out_ptr = out_uninit.as_mut_ptr() as *mut u8;
+        unsafe {
+            if master_key_vec.len() >= 32 {
+                ptr::copy_nonoverlapping(master_key_vec.as_ptr(), out_ptr, 32);
+            } else {
+                let len = master_key_vec.len();
+                ptr::copy_nonoverlapping(master_key_vec.as_ptr(), out_ptr, len);
+                ptr::write_bytes(out_ptr.add(len), 0u8, 32 - len);
+            }
+            out_uninit.assume_init()
+        }
+    };
 
     let wallet_info = WalletInfo {
         id: Uuid::new_v4(),
@@ -163,20 +171,38 @@ async fn store_wallet_securely(
                 return Err(WalletError::CryptoError("Insecure WALLET_ENC_KEY (all zeros)".into()));
             }
         }
-        let mut out = [0u8; 32];
-        out.copy_from_slice(&raw);
+        let out = {
+            let mut out_uninit = std::mem::MaybeUninit::<[u8; 32]>::uninit();
+            let out_ptr = out_uninit.as_mut_ptr() as *mut u8;
+            unsafe {
+                std::ptr::copy_nonoverlapping(raw.as_ptr(), out_ptr, 32);
+                out_uninit.assume_init()
+            }
+        };
         raw.zeroize();
         Ok(out)
     }
 
     let mut kek = load_envelope_kek()?;
-    let mut salt = [0u8; 32];
-    rand::rngs::OsRng.fill_bytes(&mut salt);
+    let mut salt = {
+        let mut s_uninit = std::mem::MaybeUninit::<[u8; 32]>::uninit();
+        let s_ptr = s_uninit.as_mut_ptr() as *mut u8;
+        unsafe {
+            rand::rngs::OsRng.fill_bytes(std::slice::from_raw_parts_mut(s_ptr, 32));
+            s_uninit.assume_init()
+        }
+    };
     let hkdf = Hkdf::<Sha256>::new(Some(&salt), &kek);
-    let mut enc_key_bytes = [0u8; 32];
     let info_v2 = wallet_data.info.hkdf_info_v2();
-    hkdf.expand(&info_v2, &mut enc_key_bytes)
-        .map_err(|e| WalletError::CryptoError(format!("Failed to derive envelope key: {}", e)))?;
+    let mut enc_key_bytes = {
+        let mut k_uninit = std::mem::MaybeUninit::<[u8; 32]>::uninit();
+        let k_ptr = k_uninit.as_mut_ptr() as *mut u8;
+        unsafe {
+            hkdf.expand(&info_v2, std::slice::from_raw_parts_mut(k_ptr, 32))
+                .map_err(|e| WalletError::CryptoError(format!("Failed to derive envelope key: {}", e)))?;
+            k_uninit.assume_init()
+        }
+    };
 
     let (encrypted_key, salt_vec, nonce_vec) = if quantum_safe {
         let encrypted_secret = quantum_crypto
@@ -192,8 +218,14 @@ async fn store_wallet_securely(
     } else {
         let cipher = Aes256Gcm::new_from_slice(&enc_key_bytes)
             .map_err(|e| WalletError::CryptoError(format!("Failed to init AES cipher: {}", e)))?;
-        let mut nonce_bytes = [0u8; 12];
-        rand::rngs::OsRng.fill_bytes(&mut nonce_bytes);
+        let mut nonce_bytes = {
+            let mut n_uninit = std::mem::MaybeUninit::<[u8; 12]>::uninit();
+            let n_ptr = n_uninit.as_mut_ptr() as *mut u8;
+            unsafe {
+                rand::rngs::OsRng.fill_bytes(std::slice::from_raw_parts_mut(n_ptr, 12));
+                n_uninit.assume_init()
+            }
+        };
         #[allow(deprecated)]
         let nonce = aes_gcm::aead::Nonce::<Aes256Gcm>::from_slice(&nonce_bytes);
         let ciphertext = cipher

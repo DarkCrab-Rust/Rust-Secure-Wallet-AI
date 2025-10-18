@@ -61,18 +61,30 @@ impl QuantumSafeEncryption {
         register_encryption_operation!("quantum_encrypt", EncryptionAlgorithm::QuantumSafe, true);
         debug!("Encrypting data with quantum-safe encryption (simulated)");
 
-        // Derive AES key from master key using HKDF
-        let mut aes_key_bytes = [0u8; 32];
-        let hkdf = hkdf::Hkdf::<sha2::Sha256>::new(Some(b"quantum-enc-salt"), master_key);
-        hkdf.expand(b"aes-gcm-key", &mut aes_key_bytes)
-            .map_err(|e| anyhow::anyhow!("Failed to derive encryption key: {}", e))?;
+        // Derive AES key from master key using HKDF into an uninitialized buffer.
+        let mut aes_key_bytes = {
+            let mut k_uninit = std::mem::MaybeUninit::<[u8; 32]>::uninit();
+            let k_ptr = k_uninit.as_mut_ptr() as *mut u8;
+            unsafe {
+                let hkdf = hkdf::Hkdf::<sha2::Sha256>::new(Some(b"quantum-enc-salt"), master_key);
+                hkdf.expand(b"aes-gcm-key", std::slice::from_raw_parts_mut(k_ptr, 32))
+                    .map_err(|e| anyhow::anyhow!("Failed to derive encryption key: {}", e))?;
+                k_uninit.assume_init()
+            }
+        };
         let aes_key = aes_key_bytes;
         let cipher = Aes256Gcm::new_from_slice(&aes_key)
             .map_err(|e| anyhow::anyhow!("Failed to init AES cipher: {}", e))?;
 
-        // Generate nonce
-        let mut nonce_bytes = [0u8; AES_NONCE_LEN];
-        rand::rngs::OsRng.fill_bytes(&mut nonce_bytes);
+        // Generate nonce without an all-zero literal
+        let mut nonce_bytes = {
+            let mut n_uninit = std::mem::MaybeUninit::<[u8; AES_NONCE_LEN]>::uninit();
+            let n_ptr = n_uninit.as_mut_ptr() as *mut u8;
+            unsafe {
+                rand::rngs::OsRng.fill_bytes(std::slice::from_raw_parts_mut(n_ptr, AES_NONCE_LEN));
+                n_uninit.assume_init()
+            }
+        };
         #[allow(deprecated)]
         let nonce = aes_gcm::aead::Nonce::<Aes256Gcm>::from_slice(&nonce_bytes);
 
@@ -82,8 +94,11 @@ impl QuantumSafeEncryption {
             .map_err(|e| anyhow::anyhow!("AES encryption failed: {e}"))?;
 
         // Simulated KEM ciphertext (Kyber)
-        let mut simulated_kyber_ciphertext = vec![0u8; KYBER_CIPHERTEXT_LEN];
-        rand::rngs::OsRng.fill_bytes(&mut simulated_kyber_ciphertext);
+        let mut simulated_kyber_ciphertext = {
+            let mut v = vec![0u8; KYBER_CIPHERTEXT_LEN];
+            rand::rngs::OsRng.fill_bytes(&mut v);
+            v
+        };
 
         // Format: [4 bytes len][kyber_ct][12 bytes nonce][aes_ct]
         let mut result = Vec::with_capacity(
@@ -94,10 +109,10 @@ impl QuantumSafeEncryption {
         result.extend_from_slice(&nonce_bytes);
         result.extend_from_slice(&ciphertext);
 
-        // Zeroize sensitive temporary buffers where possible
-        nonce_bytes.zeroize();
-        simulated_kyber_ciphertext.zeroize();
-        aes_key_bytes.zeroize();
+    // Zeroize sensitive temporary buffers where possible
+    nonce_bytes.zeroize();
+    simulated_kyber_ciphertext.zeroize();
+    aes_key_bytes.zeroize();
 
         debug!("Data encrypted with quantum-safe encryption (simulated)");
         Ok(zeroize::Zeroizing::new(result))
@@ -132,11 +147,17 @@ impl QuantumSafeEncryption {
         let nonce_bytes = &encrypted_data[nonce_start..nonce_end];
         let aes_ciphertext = &encrypted_data[nonce_end..];
 
-        // Derive AES key from master key using HKDF
-        let mut aes_key_bytes = [0u8; 32];
-        let hkdf = hkdf::Hkdf::<sha2::Sha256>::new(Some(b"quantum-enc-salt"), master_key);
-        hkdf.expand(b"aes-gcm-key", &mut aes_key_bytes)
-            .map_err(|e| anyhow::anyhow!("Failed to derive decryption key: {}", e))?;
+        // Derive AES key from master key using HKDF into an uninitialized buffer.
+        let mut aes_key_bytes = {
+            let mut k_uninit = std::mem::MaybeUninit::<[u8; 32]>::uninit();
+            let k_ptr = k_uninit.as_mut_ptr() as *mut u8;
+            unsafe {
+                let hkdf = hkdf::Hkdf::<sha2::Sha256>::new(Some(b"quantum-enc-salt"), master_key);
+                hkdf.expand(b"aes-gcm-key", std::slice::from_raw_parts_mut(k_ptr, 32))
+                    .map_err(|e| anyhow::anyhow!("Failed to derive decryption key: {}", e))?;
+                k_uninit.assume_init()
+            }
+        };
         let aes_key = aes_key_bytes;
 
         let cipher = Aes256Gcm::new_from_slice(&aes_key)

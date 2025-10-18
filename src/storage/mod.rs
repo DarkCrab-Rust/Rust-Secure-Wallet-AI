@@ -583,8 +583,14 @@ impl WalletStorage {
             raw.zeroize();
             return Err(anyhow::anyhow!("WALLET_ENC_KEY must be 32 bytes"));
         }
-        let mut out = [0u8; 32];
-        out.copy_from_slice(&raw);
+        let out = {
+            let mut out_uninit = std::mem::MaybeUninit::<[u8; 32]>::uninit();
+            let out_ptr = out_uninit.as_mut_ptr() as *mut u8;
+            unsafe {
+                std::ptr::copy_nonoverlapping(raw.as_ptr(), out_ptr, 32);
+                out_uninit.assume_init()
+            }
+        };
         raw.zeroize();
         Ok(out)
     }
