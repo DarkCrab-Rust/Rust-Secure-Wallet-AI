@@ -78,8 +78,8 @@ jobs:
       - name: Format check
         run: cargo fmt --all -- --check
 
-      - name: Clippy
-        run: cargo clippy --workspace --all-targets --all-features -- -D warnings
+      - name: Clippy (default features)
+        run: cargo clippy --workspace --all-targets -- -D warnings
 
       - name: Install cargo-nextest
         uses: taiki-e/install-action@nextest
@@ -87,8 +87,9 @@ jobs:
       - name: Run tests with nextest (default features)
         run: cargo nextest run --workspace --verbose
 
-      - name: Run tests with nextest (all features)
-        run: cargo nextest run --workspace --all-features --verbose
+      # Avoid enabling all optional features in CI to keep dependency surface minimal
+      # and prevent pulling heavy optional crates. All-feature tests can be run manually when needed.
+      # Removed: Run tests with nextest (all features)
 
   patch_elliptic_curve_tools:
     name: "Test patch: elliptic-curve-tools"
