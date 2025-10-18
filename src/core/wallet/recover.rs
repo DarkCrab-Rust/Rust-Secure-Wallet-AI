@@ -198,8 +198,9 @@ async fn store_wallet_securely(
         let mut k_uninit = std::mem::MaybeUninit::<[u8; 32]>::uninit();
         let k_ptr = k_uninit.as_mut_ptr() as *mut u8;
         unsafe {
-            hkdf.expand(&info_v2, std::slice::from_raw_parts_mut(k_ptr, 32))
-                .map_err(|e| WalletError::CryptoError(format!("Failed to derive envelope key: {}", e)))?;
+            hkdf.expand(&info_v2, std::slice::from_raw_parts_mut(k_ptr, 32)).map_err(|e| {
+                WalletError::CryptoError(format!("Failed to derive envelope key: {}", e))
+            })?;
             k_uninit.assume_init()
         }
     };

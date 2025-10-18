@@ -109,10 +109,10 @@ impl QuantumSafeEncryption {
         result.extend_from_slice(&nonce_bytes);
         result.extend_from_slice(&ciphertext);
 
-    // Zeroize sensitive temporary buffers where possible
-    nonce_bytes.zeroize();
-    simulated_kyber_ciphertext.zeroize();
-    aes_key_bytes.zeroize();
+        // Zeroize sensitive temporary buffers where possible
+        nonce_bytes.zeroize();
+        simulated_kyber_ciphertext.zeroize();
+        aes_key_bytes.zeroize();
 
         debug!("Data encrypted with quantum-safe encryption (simulated)");
         Ok(zeroize::Zeroizing::new(result))

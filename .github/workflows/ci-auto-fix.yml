@@ -5,8 +5,10 @@ on:
     workflows: [CI]
     types: [completed]
 
+# Need explicit permissions to rerun workflows and push commits
 permissions:
   contents: write
+  actions: write
 
 jobs:
   auto_fix:
@@ -24,8 +26,16 @@ jobs:
           toolchain: stable
           profile: minimal
 
+      - name: Save event payload
+        id: save_event
+        run: |
+          # the script reads GITHUB_EVENT_PATH which is available, but we also copy it to the workspace
+          echo "Event path: $GITHUB_EVENT_PATH"
+          cp "$GITHUB_EVENT_PATH" .github/event.json
+
       - name: Run auto-fix script
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_EVENT_PATH: .github/event.json
         run: |
           bash .github/scripts/ci_autofix.sh
