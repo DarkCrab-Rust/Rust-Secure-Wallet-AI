@@ -230,9 +230,9 @@ impl EncryptionStatistics {
     }
 }
 
+use std::sync::atomic::{AtomicBool, Ordering};
 /// Global encryption consistency validator instance (thread-safe)
 use std::sync::{Mutex, OnceLock};
-use std::sync::atomic::{AtomicBool, Ordering};
 
 static GLOBAL_VALIDATOR: OnceLock<Mutex<EncryptionConsistencyValidator>> = OnceLock::new();
 
@@ -319,7 +319,9 @@ pub fn get_global_statistics() -> Result<EncryptionStatistics, WalletError> {
 macro_rules! register_encryption_operation {
     ($operation:expr, $algorithm:expr, $quantum_safe:expr) => {
         if $crate::crypto::encryption_consistency::should_register_encryption_operations() {
-            if let Ok(mut validator) = $crate::crypto::encryption_consistency::get_global_validator() {
+            if let Ok(mut validator) =
+                $crate::crypto::encryption_consistency::get_global_validator()
+            {
                 validator.register_operation(
                     $operation,
                     $algorithm,
