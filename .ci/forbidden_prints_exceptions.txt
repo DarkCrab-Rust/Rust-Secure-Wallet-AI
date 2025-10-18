@@ -4,3 +4,7 @@ hex::encode(pending_tx.tx_hash().as_bytes())
 WALLET_ENC_KEY
 TEST_SKIP_DECRYPT
 BRIDGE_MOCK_FORCE_SUCCESS
+build.rs
+src/bin/wallet-cli.rs
+src/bin/nonce_harness.rs
+src/bin/debug_create.rs
