@@ -57,10 +57,37 @@ create_label "autofix" "0e8a16" "Automated fixes created by CI autofix"
 create_label "ci" "c2e0ff" "CI-related items"
 
 echo "Labels ensured. Now pushing branch to origin..."
-# Push branch using HTTPS with PAT to avoid interactive auth prompts
-GIT_PUSH_URL="https://x-access-token:${GITHUB_PAT}@github.com/${OWNER}/${REPO}.git"
-# Use git push; existing remote will be updated
-git push "$GIT_PUSH_URL" "HEAD:${BRANCH}"
+push_with_pat() {
+  local branch="$1"
+  # Validate token and resolve login to support PAT push
+  local login
+  login=$(curl -s -H "Authorization: token ${GITHUB_PAT}" -H "Accept: application/vnd.github+json" https://api.github.com/user | jq -r '.login // empty')
+  if [ -z "$login" ]; then
+    echo "Failed to validate PAT (no login returned). Ensure your PAT is valid and has 'repo' and 'workflow' scopes." >&2
+  fi
+
+  echo "Attempting push using GitHub App style token (x-access-token) ..."
+  local url_app="https://x-access-token:${GITHUB_PAT}@github.com/${OWNER}/${REPO}.git"
+  if git push "$url_app" "HEAD:${branch}"; then
+    echo "Pushed via x-access-token style URL."
+    return 0
+  fi
+
+  if [ -n "$login" ]; then
+    echo "x-access-token push failed; attempting push using login:PAT ..."
+    local url_pat="https://${login}:${GITHUB_PAT}@github.com/${OWNER}/${REPO}.git"
+    if git push "$url_pat" "HEAD:${branch}"; then
+      echo "Pushed via login:PAT URL."
+      return 0
+    fi
+  fi
+
+  echo "All push methods failed. Common causes: invalid PAT, insufficient scopes, or no permission to push to ${OWNER}/${REPO}." >&2
+  echo "Ensure PAT scopes include: repo (all) and workflow. If pushing to a fork, confirm your PAT owner has write access." >&2
+  return 1
+}
+
+push_with_pat "${BRANCH}"
 
 echo "Pushed branch. Now polling Actions for CI runs on branch ${BRANCH}"
 
