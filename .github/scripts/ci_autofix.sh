@@ -105,7 +105,41 @@ function create_pr_for_branch() {
   fi
   echo "PR created: ${PR_URL}"
   LAST_AUTOFIX_PR_URL="$PR_URL"
+  # Add labels if provided
+  if [ -n "${AUTOFIX_PR_LABELS:-}" ]; then
+    echo "Adding labels: ${AUTOFIX_PR_LABELS} to PR"
+    # labels should be comma-separated
+    labels_json=$(jq -nc --arg l "${AUTOFIX_PR_LABELS}" '$l|split(",")')
+    curl -s -X POST -H "Authorization: token ${GITHUB_TOKEN}" -H "Accept: application/vnd.github+json" \
+      -d "{\"labels\":${labels_json}}" \
+      "https://api.github.com/repos/${OWNER}/${REPO}/issues/$(echo "$resp" | jq -r .number)/labels"
+  fi
+  # Request reviewers if provided
+  if [ -n "${AUTOFIX_REQUEST_REVIEWERS:-}" ]; then
+    echo "Requesting reviewers: ${AUTOFIX_REQUEST_REVIEWERS}"
+    reviewers_json=$(jq -nc --arg r "${AUTOFIX_REQUEST_REVIEWERS}" '{reviewers: ($r|split(",") ), team_reviewers: []}')
+    curl -s -X POST -H "Authorization: token ${GITHUB_TOKEN}" -H "Accept: application/vnd.github+json" \
+      -d "${reviewers_json}" \
+      "https://api.github.com/repos/${OWNER}/${REPO}/pulls/$(echo "$resp" | jq -r .number)/requested_reviewers"
+  fi
   return 0
+}
+
+function post_comment_on_run() {
+  local run_id="$1"
+  local message="$2"
+  echo "Posting comment to workflow run ${run_id}"
+  # GitHub doesn't provide direct run comments API; comments are typically placed on the PR or issue.
+  # We'll post a comment on the PR and additionally create a short issue comment linking back to the run if needed.
+  if [ -n "${LAST_AUTOFIX_PR_URL:-}" ]; then
+    # Post comment on PR
+    PR_NUMBER=$(echo "$LAST_AUTOFIX_PR_URL" | awk -F'/' '{print $NF}')
+    curl -s -X POST -H "Authorization: token ${GITHUB_TOKEN}" -H "Accept: application/vnd.github+json" \
+      -d "{\"body\":\"${message}\"}" \
+      "https://api.github.com/repos/${OWNER}/${REPO}/issues/${PR_NUMBER}/comments"
+  fi
+  # Also create a lightweight issue for visibility referencing the run and PR (but mark it as triage-only)
+  # This is optional and only done if requested via AUTOFIX_OPEN_ISSUE_ON_FAIL == "true" and we are in final failure handling.
 }
 
 function create_issue_for_failure() {
@@ -198,13 +232,28 @@ while [ $attempt -le $MAX_ATTEMPTS ]; do
 
   if [ "$conclusion" = "success" ]; then
     echo "Rerun ${NEW_RUN_ID} succeeded. Exiting with success."
+    # If we created a PR earlier in this attempt, post a comment to link back to the run (for traceability)
+    if [ -n "${LAST_AUTOFIX_PR_URL:-}" ]; then
+      post_comment_on_run "$NEW_RUN_ID" "Automated autofix PR created: ${LAST_AUTOFIX_PR_URL}. Rerun succeeded."
+    fi
     exit 0
   else
     echo "Rerun ${NEW_RUN_ID} concluded with '${conclusion}'"
+    # If we pushed a branch, attempt to create a PR for review (no auto-merge)
+    if [ -n "${LAST_AUTOFIX_BRANCH:-}" ]; then
+      create_pr_for_branch "${LAST_AUTOFIX_BRANCH}" || echo "PR creation failed"
+      # Post link to PR on the run for traceability
+      if [ -n "${LAST_AUTOFIX_PR_URL:-}" ]; then
+        post_comment_on_run "$NEW_RUN_ID" "Automated autofix PR created: ${LAST_AUTOFIX_PR_URL}. Please review."
+      fi
+    fi
     attempt=$((attempt + 1))
     # Try to apply fixes again in next loop iteration
   fi
 done
 
-echo "All ${MAX_ATTEMPTS} attempts exhausted; leaving CI failed for human review"
+echo "All ${MAX_ATTEMPTS} attempts exhausted; creating issue for human review if possible"
+if [ -z "${SKIP_API:-}" ]; then
+  create_issue_for_failure "${LAST_AUTOFIX_PR_URL:-}"
+fi
 exit 2

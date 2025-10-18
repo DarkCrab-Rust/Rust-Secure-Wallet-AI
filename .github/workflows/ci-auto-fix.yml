@@ -40,5 +40,11 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_EVENT_PATH: .github/event.json
+          # Optional: comma-separated labels to add to autofix PRs
+          AUTOFIX_PR_LABELS: "autofix,ci"
+          # Optional: comma-separated reviewers to request (usernames)
+          AUTOFIX_REQUEST_REVIEWERS: ""
+          # Optional: create an issue if all attempts fail
+          AUTOFIX_OPEN_ISSUE_ON_FAIL: "true"
         run: |
           bash .github/scripts/ci_autofix.sh
