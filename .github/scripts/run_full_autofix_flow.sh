@@ -4,6 +4,11 @@
 
 set -euo pipefail
 
+# Prefer bundled jq if available (helps on Windows without admin install)
+if [ -x ".github/bin/jq.exe" ]; then
+  export PATH="$PWD/.github/bin:$PATH"
+fi
+
 if ! command -v jq >/dev/null 2>&1; then
   echo "This script requires 'jq' to be installed." >&2
   exit 1
@@ -36,6 +41,24 @@ API_BASE="https://api.github.com/repos/${OWNER}/${REPO}"
 
 BRANCH=$(git rev-parse --abbrev-ref HEAD)
 echo "Owner/Repo: ${OWNER}/${REPO}  Branch: ${BRANCH}"
+
+# Download logs for a workflow run (requires PAT). Saves as .github/logs/run_<id>_<label>.zip
+download_run_logs() {
+  local run_id="$1"
+  local label="${2:-ci}"
+  mkdir -p .github/logs
+  local out=".github/logs/run_${run_id}_${label}.zip"
+  echo "Downloading logs for run ${run_id} -> ${out}"
+  local code
+  code=$(curl -sSL -o "$out" -w "%{http_code}" -H "Authorization: token ${GITHUB_PAT}" -H "Accept: application/vnd.github+json" \
+    "${API_BASE}/actions/runs/${run_id}/logs") || true
+  if [ "$code" != "200" ]; then
+    echo "Failed to download logs for ${run_id} (HTTP $code). Ensure PAT has access or run is not public." >&2
+    rm -f "$out" || true
+    return 1
+  fi
+  echo "Logs saved to $out"
+}
 
 # create label if missing
 create_label() {
@@ -130,6 +153,9 @@ if [ "$conclusion" = "success" ]; then
   exit 0
 fi
 
+# Fetch logs for the failed CI run
+download_run_logs "$CI_RUN_ID" "ci" || true
+
 echo "CI run concluded with $conclusion (likely failure). Now polling for CI Auto-Fix workflow run."
 
 # find workflow id for CI Auto-Fix
@@ -169,6 +195,9 @@ while true; do
   fi
   sleep 5
 done
+
+# Fetch logs for the auto-fix run
+download_run_logs "$AUTO_RUN_ID" "autofix" || true
 
 # list open PRs and filter those with head.ref starting with autofix/
 echo "Listing open PRs created recently with head refs starting with 'autofix/'"

@@ -5,6 +5,7 @@ on:
     branches: [ main, master, archive-bridge-stub ]
   pull_request:
     branches: [ main, master, archive-bridge-stub ]
+  workflow_dispatch:
 
 jobs:
   deterministic-signing:

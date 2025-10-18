@@ -53,3 +53,11 @@ jobs:
           AUTOFIX_OPEN_ISSUE_ON_FAIL: "true"
         run: |
           bash .github/scripts/ci_autofix.sh
+
+      - name: Upload auto-fix logs (if any)
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: autofix-logs-${{ github.run_id }}
+          path: .github/logs
+          if-no-files-found: ignore

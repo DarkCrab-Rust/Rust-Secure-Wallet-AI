@@ -63,6 +63,24 @@ SLEEP_POLL=8
 LAST_AUTOFIX_PR_URL=""
 LAST_AUTOFIX_BRANCH=""
 
+# Download logs zip for a workflow run and save under .github/logs
+download_run_logs() {
+  local run_id="$1"
+  local label="${2:-ci}"
+  mkdir -p .github/logs || true
+  local out=".github/logs/run_${run_id}_${label}.zip"
+  echo "Downloading logs for run ${run_id} -> ${out}"
+  local code
+  code=$(curl -sSL -o "$out" -w "%{http_code}" -H "Authorization: token ${GITHUB_TOKEN}" -H "Accept: application/vnd.github+json" \
+    "https://api.github.com/repos/${OWNER}/${REPO}/actions/runs/${run_id}/logs") || true
+  if [ "$code" != "200" ]; then
+    echo "Failed to download logs for ${run_id} (HTTP $code)." >&2
+    rm -f "$out" || true
+    return 1
+  fi
+  echo "Logs saved to $out"
+}
+
 function do_local_fix() {
   echo "Running cargo fmt and cargo fix"
   cargo fmt --all
@@ -225,6 +243,8 @@ function get_run_status() {
 
 if [ -z "${SKIP_API:-}" ]; then
   echo "Autofix: origin run id=${ORIG_RUN_ID}, workflow_id=${WORKFLOW_ID}, branch=${BRANCH}"
+  # Attempt to capture logs of the original failed run for diagnostics
+  download_run_logs "${ORIG_RUN_ID}" "failed" || true
 else
   echo "Autofix: running in local-only mode; branch=${BRANCH}"
 fi
@@ -272,6 +292,8 @@ while [ $attempt -le $MAX_ATTEMPTS ]; do
 
   if [ "$conclusion" = "success" ]; then
     echo "Rerun ${NEW_RUN_ID} succeeded. Exiting with success."
+    # Save rerun logs as well
+    download_run_logs "${NEW_RUN_ID}" "rerun" || true
     # If we created a PR earlier in this attempt, post a comment to link back to the run (for traceability)
     if [ -n "${LAST_AUTOFIX_PR_URL:-}" ]; then
       post_comment_on_run "$NEW_RUN_ID" "Automated autofix PR created: ${LAST_AUTOFIX_PR_URL}. Rerun succeeded."
@@ -279,6 +301,8 @@ while [ $attempt -le $MAX_ATTEMPTS ]; do
     exit 0
   else
     echo "Rerun ${NEW_RUN_ID} concluded with '${conclusion}'"
+    # Save rerun logs for debugging
+    download_run_logs "${NEW_RUN_ID}" "rerun" || true
     # If we pushed a branch, attempt to create a PR for review (no auto-merge)
     if [ -n "${LAST_AUTOFIX_BRANCH:-}" ]; then
       create_pr_for_branch "${LAST_AUTOFIX_BRANCH}" || echo "PR creation failed"
