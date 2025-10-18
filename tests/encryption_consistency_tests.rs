@@ -8,8 +8,10 @@ use defi_hot_wallet::crypto::{
     },
     QuantumSafeEncryption,
 };
+use serial_test::serial;
 
 #[tokio::test]
+#[serial]
 async fn test_encryption_consistency_validation() {
     // Initialize validator with quantum crypto
     let quantum_crypto = QuantumSafeEncryption::new().unwrap();
@@ -74,6 +76,7 @@ async fn test_encryption_consistency_validation() {
 }
 
 #[tokio::test]
+#[serial]
 async fn test_encryption_statistics() {
     // Initialize validator without quantum crypto
     init_global_validator(None).unwrap();
