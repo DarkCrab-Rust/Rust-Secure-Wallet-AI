@@ -6,7 +6,7 @@ fn test_shamir_secret_sharing_basic() {
     let threshold = 3;
     let shares_count = 5;
     // create a simple [u8; 32] secret
-    let mut secret_vec: Vec<u8> = std::iter::repeat(0u8).take(32).collect();
+    let secret_vec: Vec<u8> = std::iter::repeat_n(0u8, 32).collect();
     let mut secret: [u8; 32] = secret_vec.try_into().expect("32 bytes");
     secret[0] = 42;
     secret[1] = 101;
@@ -23,7 +23,7 @@ fn test_shamir_secret_sharing_basic() {
 fn test_shamir_insufficient_shares() {
     let threshold = 3;
     let shares_count = 5;
-    let mut secret_vec: Vec<u8> = std::iter::repeat(0u8).take(32).collect();
+    let secret_vec: Vec<u8> = std::iter::repeat_n(0u8, 32).collect();
     let mut secret: [u8; 32] = secret_vec.try_into().expect("32 bytes");
     secret[0] = 42;
 
@@ -35,7 +35,7 @@ fn test_shamir_insufficient_shares() {
 
 #[test]
 fn test_shamir_invalid_threshold() {
-    let secret_vec: Vec<u8> = std::iter::repeat(0u8).take(32).collect();
+    let secret_vec: Vec<u8> = std::iter::repeat_n(0u8, 32).collect();
     let secret: [u8; 32] = secret_vec.try_into().expect("32 bytes");
 
     // threshold > shares_count should be an error
@@ -45,7 +45,7 @@ fn test_shamir_invalid_threshold() {
 
 #[test]
 fn test_shamir_zero_threshold() {
-    let secret_vec: Vec<u8> = std::iter::repeat(0u8).take(32).collect();
+    let secret_vec: Vec<u8> = std::iter::repeat_n(0u8, 32).collect();
     let secret: [u8; 32] = secret_vec.try_into().expect("32 bytes");
 
     // zero threshold should be an error
@@ -55,7 +55,7 @@ fn test_shamir_zero_threshold() {
 
 #[test]
 fn test_shamir_equal_threshold_and_shares() {
-    let secret_vec: Vec<u8> = std::iter::repeat(0u8).take(32).collect();
+    let secret_vec: Vec<u8> = std::iter::repeat_n(0u8, 32).collect();
     let secret: [u8; 32] = secret_vec.try_into().expect("32 bytes");
 
     // threshold == shares_count should succeed
@@ -65,7 +65,7 @@ fn test_shamir_equal_threshold_and_shares() {
 
 #[test]
 fn test_shamir_reconstruct_exact() {
-    let mut secret_vec: Vec<u8> = std::iter::repeat(0u8).take(32).collect();
+    let secret_vec: Vec<u8> = std::iter::repeat_n(0u8, 32).collect();
     let mut secret: [u8; 32] = secret_vec.try_into().expect("32 bytes");
     secret.iter_mut().enumerate().for_each(|(i, v)| *v = (i * 7) as u8);
     let result = split_secret(secret, 2, 3);
@@ -79,7 +79,7 @@ fn test_shamir_reconstruct_exact() {
 fn test_shamir_different_share_subsets() {
     let threshold = 3;
     let shares_count = 5;
-    let mut secret_vec: Vec<u8> = std::iter::repeat(0u8).take(32).collect();
+    let secret_vec: Vec<u8> = std::iter::repeat_n(0u8, 32).collect();
     let mut secret: [u8; 32] = secret_vec.try_into().expect("32 bytes");
     secret.iter_mut().enumerate().take(21).for_each(|(i, v)| *v = (i * 13 + 7) as u8);
 
@@ -99,9 +99,9 @@ fn test_shamir_different_share_subsets() {
 fn test_shamir_all_possible_combinations() {
     let threshold = 3;
     let shares_count = 5;
-    let mut secret_vec: Vec<u8> = std::iter::repeat(0u8).take(32).collect();
+    let mut secret_vec: Vec<u8> = std::iter::repeat_n(0u8, 32).collect();
     secret_vec.iter_mut().enumerate().take(18).for_each(|(i, v)| *v = (i * 11) as u8);
-    let mut secret: [u8; 32] = secret_vec.try_into().expect("32 bytes");
+    let secret: [u8; 32] = secret_vec.try_into().expect("32 bytes");
 
     let shares = split_secret(secret, threshold, shares_count).unwrap();
 
@@ -117,13 +117,13 @@ fn test_shamir_all_possible_combinations() {
 fn test_shamir_tampered_share() {
     let threshold = 3;
     let shares_count = 5;
-    let mut secret_vec: Vec<u8> = std::iter::repeat(0u8).take(32).collect();
+    let mut secret_vec: Vec<u8> = std::iter::repeat_n(0u8, 32).collect();
     secret_vec
         .iter_mut()
         .enumerate()
         .take(21)
         .for_each(|(i, v)| *v = if i == 0 { 0xAA } else { (i * 5) as u8 });
-    let mut secret: [u8; 32] = secret_vec.try_into().expect("32 bytes");
+    let secret: [u8; 32] = secret_vec.try_into().expect("32 bytes");
 
     let mut shares = split_secret(secret, threshold, shares_count).unwrap();
 

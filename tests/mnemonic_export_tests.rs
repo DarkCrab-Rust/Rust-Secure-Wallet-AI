@@ -5,7 +5,7 @@ fn test_encrypt_decrypt_mnemonic_roundtrip() {
     let mnemonic = "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about";
 
     // Use a fixed 32-byte key for test (constructed at runtime to avoid hard-coded literal)
-    let key_vec: Vec<u8> = std::iter::repeat(0x11u8).take(32).collect();
+    let key_vec: Vec<u8> = std::iter::repeat_n(0x11u8, 32).collect();
 
     let aad = b"/tmp/test_mnemonic.enc";
 

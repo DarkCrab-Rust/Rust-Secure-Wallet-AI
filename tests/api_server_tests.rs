@@ -32,7 +32,7 @@ async fn create_test_server() -> TestServer {
     let config = create_test_config();
     let api_key = Some(zeroize::Zeroizing::new("test_api_key".as_bytes().to_vec()));
     // Use deterministic test master key for consistent test results
-    let zeros: Vec<u8> = std::iter::repeat(0u8).take(32).collect();
+    let zeros: Vec<u8> = std::iter::repeat_n(0u8, 32).collect();
     let test_master_key = defi_hot_wallet::security::secret::vec_to_secret(zeros); // 32 zero bytes for testing
     let server = WalletServer::new_for_test(
         "127.0.0.1".to_string(),

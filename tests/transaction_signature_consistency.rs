@@ -21,7 +21,7 @@ fn test_transaction_signature_consistency() {
 
     // Prepare a test secret key
     let secp = Secp256k1::new();
-    let sk_bytes: Vec<u8> = std::iter::repeat(0x77u8).take(32).collect();
+    let sk_bytes: Vec<u8> = std::iter::repeat_n(0x77u8, 32).collect();
     let sk = SecretKey::from_slice(&sk_bytes).expect("secret key");
 
     // Build canonical message

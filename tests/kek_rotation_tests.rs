@@ -33,7 +33,7 @@ async fn rotate_kek_success_and_idempotent() {
     assert_eq!(info.name, name);
 
     // Provide a new KEK under WALLET_ENC_KEY_BLUE (32 bytes of 0x42)
-    let new_kek = std::iter::repeat(0x42u8).take(32).collect::<Vec<u8>>();
+    let new_kek = std::iter::repeat_n(0x42u8, 32).collect::<Vec<u8>>();
     std::env::set_var("WALLET_ENC_KEY_BLUE", b64(&new_kek));
 
     // Perform rotation to BLUE
