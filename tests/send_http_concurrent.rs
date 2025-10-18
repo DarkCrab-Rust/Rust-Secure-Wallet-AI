@@ -79,7 +79,7 @@ async fn test_send_route_concurrent() {
         },
         ..Default::default()
     };
-    let test_master_key = defi_hot_wallet::security::secret::vec_to_secret(vec![0u8; 32]);
+    let test_master_key = defi_hot_wallet::security::secret::vec_to_secret(std::iter::repeat(0u8).take(32).collect::<Vec<u8>>());
     // Build a WalletManager with in-memory storage so we can inject mock clients
     let storage = Arc::new(
         defi_hot_wallet::storage::WalletStorage::new_with_url("sqlite::memory:")

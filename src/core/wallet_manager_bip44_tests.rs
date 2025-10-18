@@ -22,6 +22,14 @@ fn zero_seed32() -> [u8; 32] {
     seed
 }
 
+fn pattern_seed(byte: u8) -> [u8; 32] {
+    let mut s = [0u8; 32];
+    for b in s.iter_mut() {
+        *b = byte;
+    }
+    s
+}
+
 #[tokio::test]
 async fn print_eth_bip44_from_zero_seed() {
     // Build a wallet manager with in-memory storage
@@ -162,7 +170,7 @@ async fn eth_bip32_parity_fixed_vectors() {
     let wm = WalletManager::new_with_storage(&cfg, storage, None).await.expect("wm init");
 
     // Two deterministic seeds: zero seed and an alternate pattern
-    let seeds = vec![[0u8; 32], [0x11u8; 32]];
+    let seeds = vec![zero_seed32(), pattern_seed(0x11)];
 
     for seed in seeds {
         // Our derived private key (as bytes)

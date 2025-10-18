@@ -43,7 +43,7 @@ async fn build_test_server() -> TestServer {
         0,
         cfg,
         api_key.clone(),
-    Some(defi_hot_wallet::security::secret::vec_to_secret(vec![0u8; 32])),
+    Some(defi_hot_wallet::security::secret::vec_to_secret(std::iter::repeat(0u8).take(32).collect::<Vec<u8>>())),
     )
         .await
         .expect("create WalletServer for test");

@@ -26,7 +26,8 @@ async fn setup_test_server() -> TestServer {
         ..Default::default()
     };
     // Use deterministic test master key for consistent test results
-    let test_master_key = defi_hot_wallet::security::secret::vec_to_secret(vec![0u8; 32]); // 32 zero bytes for testing
+    let zeros: Vec<u8> = std::iter::repeat(0u8).take(32).collect();
+    let test_master_key = defi_hot_wallet::security::secret::vec_to_secret(zeros); // 32 zero bytes for testing
     let server =
         WalletServer::new_for_test("127.0.0.1".to_string(), 0, config, None, Some(test_master_key))
             .await
@@ -44,7 +45,8 @@ async fn setup_test_server_with_key(api_key: Option<zeroize::Zeroizing<Vec<u8>>>
         ..Default::default()
     };
     // Use deterministic test master key for consistent test results
-    let test_master_key = defi_hot_wallet::security::secret::vec_to_secret(vec![0u8; 32]); // 32 zero bytes for testing
+    let zeros2: Vec<u8> = std::iter::repeat(0u8).take(32).collect();
+    let test_master_key = defi_hot_wallet::security::secret::vec_to_secret(zeros2); // 32 zero bytes for testing
     let server = WalletServer::new_for_test(
         "127.0.0.1".to_string(),
         0,

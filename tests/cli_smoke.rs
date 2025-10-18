@@ -7,7 +7,8 @@ use std::process::Command;
 fn hot_wallet_refuses_insecure_kek_in_prod() {
     // Ensure we run the binary without the `test-env` feature to simulate production.
     // Supply an all-zero WALLET_ENC_KEY (base64) which the runtime should reject.
-    let zeros_b64 = base64::engine::general_purpose::STANDARD.encode([0u8; 32]);
+    let zeros_vec: Vec<u8> = std::iter::repeat(0u8).take(32).collect();
+    let zeros_b64 = base64::engine::general_purpose::STANDARD.encode(&zeros_vec);
 
     // Use a deterministic target directory so the compiled binary path is predictable
     // across platforms and avoids hashed names under target/debug/deps.

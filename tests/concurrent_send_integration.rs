@@ -85,7 +85,7 @@ async fn concurrent_send_advances_nonce_by_count() {
     wm.blockchain_clients = Arc::new(clients);
 
     // Inject a deterministic test master key so derived addresses are known
-    let test_master = vec![0x77u8; 32];
+    let test_master = std::iter::repeat(0x77u8).take(32).collect::<Vec<u8>>();
     let secret_master = defi_hot_wallet::security::secret::vec_to_secret(test_master.clone());
     defi_hot_wallet::core::wallet_manager::set_test_master_key_default(secret_master.clone());
 

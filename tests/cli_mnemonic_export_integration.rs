@@ -10,9 +10,11 @@ fn test_cli_encrypted_mnemonic_export_roundtrip() {
 
     // 32-byte test key (generated securely per-test to avoid hard-coded literals)
     use rand::RngCore;
+    use zeroize::Zeroize;
     let mut key_bytes = [0u8; 32];
     rand::rngs::OsRng.fill_bytes(&mut key_bytes);
-    let key_hex = hex::encode(key_bytes);
+    // avoid needless borrow and ensure key isn't accidentally copied for encoding
+    let key_hex = hex::encode(&key_bytes);
 
     // Run wallet-cli generate-mnemonic with MNEMONIC_EXPORT_KEY and MNEMONIC_EXPORT_PATH
     let output = Command::new("cargo")
@@ -60,7 +62,6 @@ fn test_cli_encrypted_mnemonic_export_roundtrip() {
 
     // Cleanup
     // Zeroize sensitive key material before test exit
-    use zeroize::Zeroize;
     key_bytes.zeroize();
     dir.close().ok();
 }
