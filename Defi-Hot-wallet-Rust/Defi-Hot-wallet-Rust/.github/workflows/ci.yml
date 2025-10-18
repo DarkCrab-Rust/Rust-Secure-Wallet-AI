@@ -3,9 +3,10 @@ name: Rust CI
 
 on:
   push:
-    branches: [ main, develop ]
+    branches: [ main, develop, security/secretvec-ci ]
   pull_request:
     branches: [ main ]
+  workflow_dispatch:
 
 env:
   CARGO_TERM_COLOR: always
@@ -117,8 +118,6 @@ jobs:
         with:
           fetch-depth: 0
       - uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
         with:
           toolchain: stable
       - name: Cache cargo

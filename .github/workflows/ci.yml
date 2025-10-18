@@ -2,9 +2,10 @@ name: CI
 
 on:
   push:
-    branches: [ main, master, archive-bridge-stub ]
+    branches: [ main, master, archive-bridge-stub, security/secretvec-ci ]
   pull_request:
     branches: [ main, master ]
+  workflow_dispatch:
 
 env:
   CARGO_TERM_COLOR: always
