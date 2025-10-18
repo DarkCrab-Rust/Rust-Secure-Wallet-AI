@@ -137,15 +137,10 @@ async fn wallet_aad_v1_fallback_read() {
     // HKDF can write into it. After `hkdf.expand` returns successfully we assume
     // the buffer is fully initialized.
     let enc_key_bytes_slice = unsafe {
-        std::slice::from_raw_parts_mut(
-            enc_key_bytes_uninit.as_mut_ptr() as *mut u8,
-            32usize,
-        )
+        std::slice::from_raw_parts_mut(enc_key_bytes_uninit.as_mut_ptr() as *mut u8, 32usize)
     };
     hkdf.expand(&info_v1, enc_key_bytes_slice).unwrap();
     let mut enc_key_bytes = unsafe { enc_key_bytes_uninit.assume_init() };
-
-    // AES-GCM with v1 AAD (legacy)
     let cipher = Aes256Gcm::new_from_slice(&enc_key_bytes).unwrap();
     let mut nonce_bytes = [0u8; 12];
     rand::rngs::OsRng.fill_bytes(&mut nonce_bytes);

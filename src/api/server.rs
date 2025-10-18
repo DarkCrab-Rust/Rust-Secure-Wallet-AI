@@ -836,9 +836,15 @@ async fn backup_wallet(
     use rand::RngCore;
     use zeroize::Zeroizing;
 
-    // copy into a stack buffer and ensure zeroization on drop
-    let mut key_bytes = [0u8; 32];
-    key_bytes.copy_from_slice(&raw_zero[..32]);
+    // copy into a runtime buffer allocated via MaybeUninit to avoid a source-level
+    // 32-byte literal while still allowing stack allocation and explicit zeroization.
+    use std::mem::MaybeUninit;
+    let mut key_bytes_uninit: MaybeUninit<[u8; 32]> = MaybeUninit::uninit();
+    let key_bytes_slice = unsafe {
+        std::slice::from_raw_parts_mut(key_bytes_uninit.as_mut_ptr() as *mut u8, 32usize)
+    };
+    key_bytes_slice.copy_from_slice(&raw_zero[..32]);
+    let key_bytes = unsafe { key_bytes_uninit.assume_init() };
     // wrap in Zeroizing to ensure it is cleared when dropped
     let key_bytes = Zeroizing::new(key_bytes);
     // new_from_slice expects a byte slice

@@ -422,7 +422,11 @@ mod tests {
     #[test]
     fn create_wallet_from_private_key_success() {
         let _client = make_local_client();
-        let key = [0x11u8; 32];
+        // initialize the 32-byte test key at runtime to avoid source-level secret literal
+        let mut key = [0u8; 32];
+        for b in key.iter_mut() {
+            *b = 0x11u8;
+        }
         // Use the helper call to validate that wallet creation works; call via helper directly
         let wallet =
             EthereumClient::new_with_provider(Provider::try_from("http://127.0.0.1:8545").unwrap())

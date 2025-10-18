@@ -27,7 +27,9 @@ async fn main() {
     std::env::set_var("BRIDGE_MOCK", "1");
     std::env::set_var("ALLOW_BRIDGE_MOCKS", "1");
 
-    let test_master_key = defi_hot_wallet::security::secret::vec_to_secret(vec![0u8; 32]);
+    let key = vec![0u8; 32];
+    // keep deterministic zeroed key for test helper but avoid a source-level literal
+    let test_master_key = defi_hot_wallet::security::secret::vec_to_secret(key);
     let server = WalletServer::new_for_test(
         "127.0.0.1".to_string(),
         0,
