@@ -2,7 +2,6 @@
 mod sop_tests {
     use k256::{AffinePoint as K256Affine, ProjectivePoint as K256Projective};
     use p256::{AffinePoint as P256Affine, ProjectivePoint as P256Projective};
-    use serde_json;
 
     #[test]
     fn serdes_roundtrip_k256_affine() {

@@ -12,7 +12,7 @@ fn test_cli_encrypted_mnemonic_export_roundtrip() {
     use rand::RngCore;
     let mut key_bytes = [0u8; 32];
     rand::rngs::OsRng.fill_bytes(&mut key_bytes);
-    let key_hex = hex::encode(&key_bytes);
+    let key_hex = hex::encode(key_bytes);
 
     // Run wallet-cli generate-mnemonic with MNEMONIC_EXPORT_KEY and MNEMONIC_EXPORT_PATH
     let output = Command::new("cargo")
