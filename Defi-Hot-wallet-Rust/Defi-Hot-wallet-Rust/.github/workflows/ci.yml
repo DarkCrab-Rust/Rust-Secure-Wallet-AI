@@ -85,7 +85,7 @@ jobs:
         uses: taiki-e/install-action@nextest
 
       - name: Run tests with nextest (default features)
-        run: cargo nextest run --workspace --verbose
+        run: cargo nextest run --workspace --features test-env --verbose
 
       # Avoid enabling all optional features in CI to keep dependency surface minimal
       # and prevent pulling heavy optional crates. All-feature tests can be run manually when needed.
@@ -161,7 +161,7 @@ jobs:
         run: |
           # avoid building all-features (huge dependency graph) to reduce disk / memory pressure
           # run workspace tests with default features only
-          cargo tarpaulin --verbose --workspace --timeout 120 --out Xml --run-types Tests
+          cargo tarpaulin --verbose --workspace --features test-env --timeout 120 --out Xml --run-types Tests
 
   build:
     name: Build (${{ matrix.os }})
@@ -209,7 +209,7 @@ jobs:
         uses: taiki-e/install-action@nextest
 
       - name: Test release with nextest
-        run: cargo nextest run --release --verbose
+        run: cargo nextest run --release --features test-env --verbose
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
