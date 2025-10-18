@@ -232,8 +232,22 @@ impl EncryptionStatistics {
 
 /// Global encryption consistency validator instance (thread-safe)
 use std::sync::{Mutex, OnceLock};
+use std::sync::atomic::{AtomicBool, Ordering};
 
 static GLOBAL_VALIDATOR: OnceLock<Mutex<EncryptionConsistencyValidator>> = OnceLock::new();
+
+// Runtime toggle to control whether registration macros actually record operations.
+// Default: disabled so unrelated tests don't race on the global validator.
+static REGISTRATION_ENABLED: OnceLock<AtomicBool> = OnceLock::new();
+
+fn registration_flag() -> &'static AtomicBool {
+    REGISTRATION_ENABLED.get_or_init(|| AtomicBool::new(false))
+}
+
+/// Returns true if encryption operations registration is enabled.
+pub fn should_register_encryption_operations() -> bool {
+    registration_flag().load(Ordering::Relaxed)
+}
 
 /// Initialize the global encryption consistency validator
 pub fn init_global_validator(
@@ -247,6 +261,8 @@ pub fn init_global_validator(
     if let Some(crypto) = quantum_crypto {
         guard.quantum_crypto = Some(crypto);
     }
+    // Enable registration once explicitly initialized by the caller (tests or app startup).
+    registration_flag().store(true, Ordering::Relaxed);
     info!("Global encryption consistency validator initialized");
     Ok(())
 }
@@ -302,14 +318,16 @@ pub fn get_global_statistics() -> Result<EncryptionStatistics, WalletError> {
 #[macro_export]
 macro_rules! register_encryption_operation {
     ($operation:expr, $algorithm:expr, $quantum_safe:expr) => {
-        if let Ok(mut validator) = $crate::crypto::encryption_consistency::get_global_validator() {
-            validator.register_operation(
-                $operation,
-                $algorithm,
-                $quantum_safe,
-                module_path!(),
-                line!(),
-            );
+        if $crate::crypto::encryption_consistency::should_register_encryption_operations() {
+            if let Ok(mut validator) = $crate::crypto::encryption_consistency::get_global_validator() {
+                validator.register_operation(
+                    $operation,
+                    $algorithm,
+                    $quantum_safe,
+                    module_path!(),
+                    line!(),
+                );
+            }
         }
     };
 }
