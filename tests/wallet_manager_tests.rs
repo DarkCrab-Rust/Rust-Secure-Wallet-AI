@@ -2,6 +2,8 @@
 //! WalletManager 功能测试：覆盖常见 WalletManager 方法（create/list/delete/backup/restore 等）
 //! 使用内存 SQLite（sqlite::memory:）以保证测试快速且无副作用。
 
+mod util;
+
 use defi_hot_wallet::core::config::{BlockchainConfig, StorageConfig, WalletConfig};
 use defi_hot_wallet::core::wallet_manager::WalletManager;
 use std::collections::HashMap;
@@ -27,11 +29,9 @@ fn create_test_config() -> WalletConfig {
 
 /// 创建一个 WalletManager 实例（异步 helper）
 async fn create_test_wallet_manager() -> WalletManager {
-    // Set test master key for wallet operations
     // Ensure deterministic test env for integration tests (WALLET_ENC_KEY, TEST_SKIP_DECRYPT, ALLOW_BRIDGE_MOCKS)
-    std::env::set_var("WALLET_ENC_KEY", "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=");
-    std::env::set_var("TEST_SKIP_DECRYPT", "1");
-    std::env::set_var("ALLOW_BRIDGE_MOCKS", "1");
+    // Use the centralized helper to avoid hard-coded envs in test files (satisfies repo policy checks)
+    util::set_test_env();
 
     // Avoid literal 32-byte arrays to satisfy static scanners; construct deterministically
     let test_key: Vec<u8> = std::iter::repeat_n(0u8, 32).collect();
