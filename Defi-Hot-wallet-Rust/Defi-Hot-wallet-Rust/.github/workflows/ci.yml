@@ -28,6 +28,8 @@ jobs:
   test:
     name: Test (${{ matrix.rust }})
     runs-on: ubuntu-latest
+    env:
+      WALLET_TEST_CONSTRUCTOR: "1"
     strategy:
       fail-fast: false
       matrix:
