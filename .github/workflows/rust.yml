@@ -12,13 +12,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: 安装 Rust
+      - name: 安装 Rust (stable)
         uses: actions-rs/toolchain@v1
         with:
           profile: minimal
           toolchain: stable
           override: true
-          components: miri
 
       - name: 安装 cargo-audit
         run: cargo install cargo-audit
@@ -26,10 +25,12 @@ jobs:
       - name: 扫漏洞 (cargo audit)
         run: cargo audit
 
-      - name: 设置 Miri
+      - name: Setup and run Miri (nightly)
         run: |
-          rustup component add miri
-          cargo miri setup
-
-      - name: 内存测试 (Miri)
-        run: cargo miri test
+          # Install nightly toolchain and add miri to that toolchain. miri
+          # is not always available for the latest stable channel; running it
+          # on nightly avoids rustup/component availability errors.
+          rustup toolchain install nightly || true
+          rustup component add miri --toolchain nightly
+          cargo +nightly miri setup
+          cargo +nightly miri test
