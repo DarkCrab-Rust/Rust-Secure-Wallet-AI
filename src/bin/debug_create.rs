@@ -20,8 +20,9 @@ async fn main() {
         derivation: Default::default(),
     };
 
-    // Set same envs as new_for_test
-    std::env::set_var("WALLET_ENC_KEY", "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=");
+    // Set same envs as new_for_test. Avoid hardcoding WALLET_ENC_KEY in source to
+    // satisfy repository policy checks. Run-time users or test helpers should set
+    // `WALLET_ENC_KEY` via environment or use `tests::util::set_test_env()`.
     std::env::set_var("TEST_SKIP_DECRYPT", "1");
     std::env::set_var("BRIDGE_MOCK_FORCE_SUCCESS", "1");
     std::env::set_var("BRIDGE_MOCK", "1");
