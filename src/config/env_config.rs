@@ -16,11 +16,13 @@ pub struct AppEnvConfig {
 
 impl AppEnvConfig {
     pub fn from_env() -> Result<Self> {
-        let database_url =
-            env::var("DATABASE_URL").unwrap_or_else(|_| "sqlite://./wallets.db".to_string());
-        let ethereum_rpc_url = env::var("WALLET_ETHEREUM_RPC_URL").ok();
-        let some_field = env::var("APP_SOME_FIELD").ok();
-        let another_field = env::var("APP_ANOTHER_FIELD").ok();
+        use defi_hot_wallet::security::env_manager::secure_env;
+
+        let database_url = secure_env::get_database_url()
+            .unwrap_or_else(|_| "sqlite://./wallets.db".to_string());
+        let ethereum_rpc_url = secure_env::get_ethereum_rpc_url().ok();
+        let some_field = std::env::var("APP_SOME_FIELD").ok(); // Keep as-is for non-sensitive fields
+        let another_field = std::env::var("APP_ANOTHER_FIELD").ok(); // Keep as-is for non-sensitive fields
 
         Ok(AppEnvConfig { database_url, ethereum_rpc_url, some_field, another_field })
     }

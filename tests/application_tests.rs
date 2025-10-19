@@ -2,7 +2,7 @@
 //!
 //! Tests for the application service layer in `src/application/application.rs`.
 
-use defi_hot_wallet::core::domain::Wallet;
+use defi_hot_wallet::mvp::Wallet;
 use defi_hot_wallet::service::WalletService;
 
 #[test]
@@ -21,13 +21,14 @@ async fn test_create_wallet_service() {
 
     assert!(result.is_ok());
     let wallet = result.unwrap();
-    assert_eq!(wallet.id, "test");
+    let mn = wallet.mnemonic_secret();
+    assert_eq!(mn.as_str(), mnemonic);
 }
 
 #[tokio::test]
 async fn test_send_tx_service() {
     let service = WalletService::new();
-    let wallet = Wallet { id: "test_wallet_id".to_string() };
+    let wallet = Wallet::from_mnemonic("test mnemonic").expect("create wallet");
     let to_address = "0x1234567890abcdef";
     let amount = 100;
 
@@ -36,5 +37,5 @@ async fn test_send_tx_service() {
     assert!(result.is_ok());
     let tx = result.unwrap();
     assert_eq!(tx.to, to_address);
-    assert_eq!(tx.amount, amount);
+    assert_eq!(tx.amount, amount.to_string());
 }

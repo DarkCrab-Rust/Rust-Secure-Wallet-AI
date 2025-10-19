@@ -5,7 +5,8 @@
 //! - NodeManager::new_infura
 //! - NodeManager::send_tx (success and RPC error paths)
 
-use defi_hot_wallet::core::domain::{Tx, Wallet};
+use defi_hot_wallet::core::domain::Tx;
+use defi_hot_wallet::mvp::Wallet;
 use defi_hot_wallet::network::node_manager::{select_node, NodeManager};
 use httpmock::{Method, MockServer};
 use serde_json::json;

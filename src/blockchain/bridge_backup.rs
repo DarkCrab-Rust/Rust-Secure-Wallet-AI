@@ -122,10 +122,9 @@ impl EthereumToSolanaBridge {
             return Err(anyhow::anyhow!("Unsupported token: {}", token));
         }
 
-        let amount_float: f64 = amount.parse()?;
-        if amount_float <= 0.0 {
-            return Err(anyhow::anyhow!("Invalid amount: {}", amount));
-        }
+        // Use strict decimal validation: positive amount with up to 18 decimals
+        crate::core::validation::validate_amount_strict(amount, 18)
+            .map_err(|_| anyhow::anyhow!("Invalid amount: {}", amount))?;
 
         Ok(())
     }
@@ -134,7 +133,9 @@ impl EthereumToSolanaBridge {
     pub async fn check_liquidity(&self, to_chain: &str, token: &str, amount: &str) -> Result<bool> {
         info!("[SIMULATED] Checking liquidity for {} {} on {}", amount, token, to_chain);
 
-        let has_liquidity = rand::thread_rng().gen::<bool>();
+        use rand::Rng;
+        let mut rng = rand::rngs::OsRng;
+        let has_liquidity: bool = rng.gen();
 
         if !has_liquidity {
             info!("[SIMULATED] Insufficient liquidity for {} {} on {}", amount, token, to_chain);
@@ -246,7 +247,7 @@ async fn mock_check_transfer_status(tx_hash: &str) -> Result<BridgeTransactionSt
     let current_count = *count;
     drop(checks);
 
-    let mut rng = rand::thread_rng();
+    let mut rng = rand::rngs::OsRng;
 
     let mut forced_ratio: Option<bool> = None;
     let mut forced_roll: Option<u32> = None;
@@ -450,7 +451,7 @@ mod tests {
 
         async fn send_transaction(
             &self,
-            _private_key: &[u8],
+            _private_key: &crate::core::domain::PrivateKey,
             _to_address: &str,
             _amount: &str,
         ) -> Result<String> {
@@ -496,6 +497,7 @@ mod tests {
                 networks: vec!["eth".to_string(), "solana".to_string()],
             },
             encrypted_master_key: vec![],
+            shamir_shares: vec![],
             salt: vec![],
             nonce: vec![],
         }

@@ -37,15 +37,17 @@ fn create_test_config() -> WalletConfig {
         },
         quantum_safe: false,
         multi_sig_threshold: 1,
+        derivation: Default::default(),
     }
 }
 
 async fn create_test_server() -> TestServer {
     init_test_env();
     let config = create_test_config();
-    let api_key = Some("stable_api_key".to_string());
+    let api_key = Some(zeroize::Zeroizing::new("stable_api_key".as_bytes().to_vec()));
     // provide deterministic master key so handlers do not attempt real decryption
-    let test_master_key = Some(vec![0u8; 32]);
+    let zeros: Vec<u8> = std::iter::repeat_n(0u8, 32).collect();
+    let test_master_key = Some(defi_hot_wallet::security::secret::vec_to_secret(zeros));
     let server = WalletServer::new_for_test(
         "127.0.0.1".to_string(),
         0,
@@ -69,6 +71,34 @@ async fn create_wallet(server: &TestServer, name: &str) {
 }
 
 #[tokio::test(flavor = "current_thread")]
+async fn stable_rotate_signing_key() {
+    let server = create_test_server().await;
+    let name = format!("rot_{}", Uuid::new_v4().simple());
+    create_wallet(&server, &name).await;
+
+    // first rotate should move from v1->v2
+    let res = server
+        .post(&format!("/api/wallets/{}/rotate-signing-key", name))
+        .add_header("Authorization", "stable_api_key")
+        .await;
+    assert_eq!(res.status_code(), StatusCode::OK, "rotate endpoint should succeed");
+    let j: Value = res.json();
+    assert_eq!(j["wallet"].as_str(), Some(name.as_str()));
+    assert_eq!(j["old_version"].as_u64(), Some(1));
+    assert_eq!(j["new_version"].as_u64(), Some(2));
+
+    // rotate again -> v2->v3
+    let res2 = server
+        .post(&format!("/api/wallets/{}/rotate-signing-key", name))
+        .add_header("Authorization", "stable_api_key")
+        .await;
+    assert_eq!(res2.status_code(), StatusCode::OK, "second rotation should succeed");
+    let j2: Value = res2.json();
+    assert_eq!(j2["old_version"].as_u64(), Some(2));
+    assert_eq!(j2["new_version"].as_u64(), Some(3));
+}
+
+#[tokio::test(flavor = "current_thread")]
 async fn stable_bridge_wallet_lifecycle_and_success() {
     let server = create_test_server().await;
     let name = format!("stable_{}", Uuid::new_v4().simple());
@@ -89,8 +119,8 @@ async fn stable_bridge_wallet_lifecycle_and_success() {
         .add_header("Authorization", "stable_api_key")
         .await;
     if res.status_code() != StatusCode::OK {
-        // surface body for debugging in CI logs
-        eprintln!("STABLE_BRIDGE_DBG: {} body: {}", res.status_code(), res.text());
+        // surface body for debugging in CI logs via tracing
+        tracing::debug!(status = %res.status_code(), body = %res.text(), "STABLE_BRIDGE_DBG");
     }
     assert_eq!(res.status_code(), StatusCode::OK);
     let j: Value = res.json();
@@ -129,7 +159,7 @@ async fn stable_bridge_concurrent_requests() {
     let results = join_all(futs).await;
     for (status, text) in results {
         if status != StatusCode::OK {
-            eprintln!("CONCURRENT_STABLE_DBG: {} body: {}", status, text);
+            tracing::debug!(status = %status, body = %text, "CONCURRENT_STABLE_DBG");
         }
         assert_eq!(status, StatusCode::OK);
     }

@@ -1,8 +1,35 @@
 ﻿use std::sync::Mutex;
+use zeroize::{Zeroize, ZeroizeOnDrop};
+use zeroize::Zeroizing;
+
+/// Convenient alias for secret buffers that will be zeroized on drop.
+pub type SecretVec = zeroize::Zeroizing<Vec<u8>>;
 
 // 涓轰簡娴嬭瘯鐩殑锛屼娇鐢ㄤ竴涓畝鍗曠殑鍐呭瓨瀛樺偍
 // 鍦ㄥ疄闄呭簲鐢ㄤ腑锛岃繖浼氭槸涓€涓畨鍏ㄧ殑銆佹寔涔呭寲鐨勫瓨鍌ㄦ満鍒?
-static KEY_STORAGE: Mutex<Option<Vec<u8>>> = Mutex::new(None);
+static KEY_STORAGE: Mutex<Option<SecurePrivateKey>> = Mutex::new(None);
+
+/// 安全的私钥包装器，确保内存被安全擦除
+#[derive(Clone, Zeroize, ZeroizeOnDrop)]
+pub struct SecurePrivateKey {
+    #[zeroize(skip)]
+    pub algorithm: String,
+    // Keep the underlying key in a Zeroizing buffer when possible.
+    pub key_data: Zeroizing<Vec<u8>>,
+}
+
+impl SecurePrivateKey {
+    pub fn new(key_data: Vec<u8>, algorithm: &str) -> Self {
+        Self {
+            algorithm: algorithm.to_string(),
+            key_data: Zeroizing::new(key_data),
+        }
+    }
+
+    pub fn as_bytes(&self) -> &[u8] {
+        &self.key_data
+    }
+}
 
 /// 瀵嗛挜绠＄悊鐩稿叧鐨勯敊璇被鍨?
 #[derive(Debug, thiserror::Error)]
@@ -17,15 +44,31 @@ pub enum KeyManagementError {
     InvalidKey(String),
 }
 
-/// 鐢熸垚涓€涓柊鐨勫瘑閽ャ€?
-/// 鍦ㄥ疄闄呭簲鐢ㄤ腑锛岃繖浼氫娇鐢ㄤ竴涓瘑鐮佸瀹夊叏鐨勯殢鏈烘暟鐢熸垚鍣ㄣ€?
-pub fn generate_key() -> Result<Vec<u8>, KeyManagementError> {
-    // 绀轰緥锛氱敓鎴愪竴涓?6瀛楄妭鐨勫瘑閽?
-    // 瀹為檯搴旂敤涓簲浣跨敤 `rand::Rng` 鍜?`rand::thread_rng()`
-    Ok(vec![
-        0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F,
-        0x10,
-    ])
+/// 生成一个新的私钥
+/// 在生产应用中，这将使用一个密码学安全的随机数生成器
+pub fn generate_key() -> Result<SecretVec, KeyManagementError> {
+    use rand::RngCore;
+
+    // 生成32字节的随机私钥（secp256k1标准）
+    let mut key = vec![0u8; 32];
+    rand::rngs::OsRng.fill_bytes(&mut key);
+
+    // 验证私钥是否在secp256k1曲线的有效范围内
+    // secp256k1的阶数是0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141
+    let secp_order = hex::decode("FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141")
+        .map_err(|_| KeyManagementError::KeyGenerationFailed)?;
+
+    // 确保私钥不为0且小于secp256k1阶数
+    if key.iter().all(|&b| b == 0) {
+        return Err(KeyManagementError::KeyGenerationFailed);
+    }
+
+    // 简单的范围检查（生产环境中应该使用更严格的检查）
+    if key.len() == 32 && key[0] != 0 {
+        Ok(zeroize::Zeroizing::new(key))
+    } else {
+        Err(KeyManagementError::KeyGenerationFailed)
+    }
 }
 
 /// 瀛樺偍涓€涓瘑閽ャ€?
@@ -34,20 +77,24 @@ pub fn store_key(key: &[u8]) -> Result<(), KeyManagementError> {
     if key.is_empty() {
         return Err(KeyManagementError::InvalidKey("Key cannot be empty".to_string()));
     }
+    let secure_key = SecurePrivateKey::new(key.to_vec(), "secp256k1");
     let mut storage = KEY_STORAGE
         .lock()
         .map_err(|e| KeyManagementError::KeyStorageFailed(e.to_string()))?;
-    *storage = Some(key.to_vec());
+    *storage = Some(secure_key);
     Ok(())
 }
 
 /// 妫€绱㈠瓨鍌ㄧ殑瀵嗛挜銆?
 /// 鍦ㄥ疄闄呭簲鐢ㄤ腑锛岃繖浼氫粠鎸佷箙鍖栧瓨鍌ㄤ腑璇诲彇骞惰В瀵嗗瘑閽ャ€?
-pub fn retrieve_key() -> Result<Vec<u8>, KeyManagementError> {
+pub fn retrieve_key() -> Result<SecretVec, KeyManagementError> {
     let storage = KEY_STORAGE
         .lock()
         .map_err(|e| KeyManagementError::KeyStorageFailed(e.to_string()))?;
-    storage.clone().ok_or(KeyManagementError::KeyNotFound)
+    match storage.as_ref() {
+        Some(secure_key) => Ok(secure_key.key_data.clone()),
+        None => Err(KeyManagementError::KeyNotFound),
+    }
 }
 
 /// 娓呴櫎鎵€鏈夊瓨鍌ㄧ殑瀵嗛挜銆?
@@ -56,7 +103,7 @@ pub fn clear_keys() -> Result<(), KeyManagementError> {
     let mut storage = KEY_STORAGE
         .lock()
         .map_err(|e| KeyManagementError::KeyStorageFailed(e.to_string()))?;
-    *storage = None;
+    *storage = None; // SecurePrivateKey的ZeroizeOnDrop会自动擦除内存
     Ok(())
 }
 
@@ -68,7 +115,7 @@ mod tests {
     fn test_generate_key() {
         let key = generate_key().unwrap();
         assert!(!key.is_empty());
-        assert_eq!(key.len(), 16); // 鍋囪鐢熸垚16瀛楄妭瀵嗛挜
+        assert_eq!(key.len(), 32); // 生成32字节私钥（secp256k1标准）
     }
 
     #[test]

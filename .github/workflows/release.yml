@@ -8,7 +8,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
       - name: Dry-run publish
         run: cargo publish --no-verify --dry-run
       # 需要发布到 crates.io 时，取消注释并在仓库 Secrets 配置 CARGO_REGISTRY_TOKEN

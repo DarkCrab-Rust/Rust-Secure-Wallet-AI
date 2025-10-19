@@ -64,29 +64,30 @@ fn create_mock_wallet_data() -> SecureWalletData {
             networks: vec!["eth".to_string(), "solana".to_string(), "bsc".to_string()],
         },
         encrypted_master_key: vec![1, 2, 3, 4],
+        shamir_shares: vec![vec![1, 2, 3], vec![4, 5, 6], vec![7, 8, 9]],
         salt: vec![5, 6, 7, 8],
         nonce: vec![9, 10, 11, 12],
     }
 }
 
 async fn monitor_bridge_status(bridge: &impl Bridge, tx_hash: &str) {
-    println!("馃攳 Monitoring bridge transaction: {}", tx_hash);
+    tracing::info!("Monitoring bridge transaction: {}", tx_hash);
     for i in 1..=5 {
         tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
         match bridge.check_transfer_status(tx_hash).await {
             Ok(status) => {
-                println!("鈴憋笍  Status check {}: {:?}", i, status);
+                tracing::info!(check = i, status = ?status, "Bridge status update");
                 if matches!(status, BridgeTransactionStatus::Completed) {
-                    println!("鉁?Bridge transfer completed!");
+                    tracing::info!("Bridge transfer completed");
                     break;
                 }
                 if let BridgeTransactionStatus::Failed(ref reason) = status {
-                    println!("鉂?Bridge transfer failed: {}", reason);
+                    tracing::warn!("Bridge transfer failed: {}", reason);
                     break;
                 }
             },
             Err(e) => {
-                println!("鉂?Error checking status: {}", e);
+                tracing::error!("Error checking status: {}", e);
                 break;
             }
         }
@@ -102,38 +103,38 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     
     match cli.command {
         Commands::EthToSol { amount, token } => {
-            println!("馃寜 Testing ETH to Solana bridge with {} {}", amount, token);
+            tracing::info!("Testing ETH to Solana bridge", amount = %amount, token = %token);
             
             let bridge = EthereumToSolanaBridge::new("0xMockBridgeContract");
             let result = bridge.transfer_across_chains(
                 "eth", "solana", &token, &amount, &wallet_data
             ).await?;
             
-            println!("馃攧 Bridge transaction initiated: {}", result);
+            tracing::info!("Bridge transaction initiated", tx = %result);
             monitor_bridge_status(&bridge, &result).await;
         },
         
         Commands::SolToEth { amount, token } => {
-            println!("馃寜 Testing Solana to ETH bridge with {} {}", amount, token);
+            tracing::info!("Testing Solana to ETH bridge", amount = %amount, token = %token);
             
             let bridge = SolanaToEthereumBridge::new("0xMockReverseBridgeContract");
             let result = bridge.transfer_across_chains(
                 "solana", "eth", &token, &amount, &wallet_data
             ).await?;
             
-            println!("馃攧 Bridge transaction initiated: {}", result);
+            tracing::info!("Bridge transaction initiated", tx = %result);
             monitor_bridge_status(&bridge, &result).await;
         },
         
         Commands::EthToBsc { amount, token } => {
-            println!("馃寜 Testing ETH to BSC bridge with {} {}", amount, token);
+            tracing::info!("Testing ETH to BSC bridge", amount = %amount, token = %token);
             
             let bridge = EthereumToBSCBridge::new("0xMockEthBscBridge");
             let result = bridge.transfer_across_chains(
                 "eth", "bsc", &token, &amount, &wallet_data
             ).await?;
             
-            println!("馃攧 Bridge transaction initiated: {}", result);
+            tracing::info!("Bridge transaction initiated", tx = %result);
             monitor_bridge_status(&bridge, &result).await;
         },
     }

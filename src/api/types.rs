@@ -52,10 +52,26 @@ pub struct TransactionHistoryResponse {
     pub transactions: Vec<String>,
 }
 
-#[derive(Serialize)]
-pub struct BackupResponse {
-    pub seed_phrase: String,
+#[derive(Serialize, Deserialize, Debug)]
+pub struct EncryptedBackupResponse {
+    /// Format version for the encrypted backup object
+    pub version: String,
+    /// Algorithm used, e.g. AES-256-GCM
+    pub alg: String,
+    /// KEK identifier used to encrypt this backup (optional)
+    pub kek_id: Option<String>,
+    /// Base64-encoded nonce
+    pub nonce: String,
+    /// Base64-encoded ciphertext (encrypted seed phrase)
+    pub ciphertext: String,
+    /// Wallet name for reference
+    pub wallet: String,
 }
+
+// Backwards-compatible alias for handler usage in tests; production handlers should
+// return `EncryptedBackupResponse`. For test-env, we still allow returning plaintext
+// in the `ciphertext` field with `alg = "PLAINTEXT"` to preserve deterministic tests.
+pub type BackupResponse = EncryptedBackupResponse;
 
 #[derive(Clone, Debug, Deserialize)]
 pub struct RestoreWalletRequest {
@@ -77,4 +93,11 @@ pub struct MultiSigTransactionRequest {
 pub struct ErrorResponse {
     pub error: String,
     pub code: String,
+}
+
+#[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
+pub struct RotateSigningKeyResponse {
+    pub wallet: String,
+    pub old_version: u32,
+    pub new_version: u32,
 }

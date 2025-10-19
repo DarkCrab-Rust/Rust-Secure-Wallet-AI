@@ -1,0 +1,25 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, master, security/secretvec-ci ]
+  pull_request:
+    branches: [ main, master ]
+  # Allow manual runs from the Actions tab and gh CLI
+  workflow_dispatch:
+
+jobs:
+  clippy:
+    name: Clippy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+      - name: Run cargo clippy
+        run: |
+          set -e
+          cargo clippy --all-targets -- -D warnings

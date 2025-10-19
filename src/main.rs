@@ -53,8 +53,27 @@ async fn main() -> Result<()> {
 
     // Runtime safety: refuse to run in production if TEST_SKIP_DECRYPT is set.
     if std::env::var("TEST_SKIP_DECRYPT").is_ok() && !cfg!(feature = "test-env") {
-        eprintln!("Refusing to start: TEST_SKIP_DECRYPT set but binary not built with `test-env`");
+        // Avoid printing secrets or test-only flags to stderr in production builds.
+        tracing::error!(
+            "Refusing to start: TEST_SKIP_DECRYPT set but binary not built with `test-env`"
+        );
         std::process::exit(1);
+    }
+
+    // High severity: refuse insecure WALLET_ENC_KEY (all zeros) when not built with test-env.
+    #[cfg(not(feature = "test-env"))]
+    {
+        if let Ok(b64) = std::env::var("WALLET_ENC_KEY") {
+            use base64::Engine as _;
+            if let Ok(bytes) = base64::engine::general_purpose::STANDARD.decode(b64.trim()) {
+                if bytes.len() == 32 && bytes.iter().all(|&b| b == 0) {
+                    tracing::error!(
+                        "Refusing to start: Insecure WALLET_ENC_KEY detected (all zeros). Set a strong 32-byte key."
+                    );
+                    std::process::exit(1);
+                }
+            }
+        }
     }
 
     // Fast path: handle create subcommand without initializing server
@@ -63,9 +82,9 @@ async fn main() -> Result<()> {
         return Ok(());
     }
 
-    // Read DATABASE_URL from env or fallback to relative path in current dir
-    let database_url =
-        std::env::var("DATABASE_URL").unwrap_or_else(|_| "sqlite://./wallets.db".to_string());
+    // Read DATABASE_URL from env securely or fallback to relative path in current dir
+    let database_url = defi_hot_wallet::security::env_manager::secure_env::get_database_url()
+        .unwrap_or_else(|_| "sqlite://./wallets.db".to_string());
 
     // A default configuration.
     let wallet_config = WalletConfig {
@@ -80,12 +99,22 @@ async fn main() -> Result<()> {
         },
         quantum_safe: false,
         multi_sig_threshold: 2,
+        derivation: Default::default(),
     };
 
-    // Read API_KEY from environment
-    let api_key = std::env::var("API_KEY").ok();
+    // Read API_KEY from environment securely
+    let api_key = defi_hot_wallet::security::env_manager::secure_env::get_api_key().ok();
 
-    let server = WalletServer::new("127.0.0.1".to_string(), 8080, wallet_config, api_key).await?;
+    let server =
+        WalletServer::new("127.0.0.1".to_string(), 8080, wallet_config.clone(), api_key).await?;
+
+    // Initialize global encryption consistency validator
+    let quantum_crypto = if wallet_config.quantum_safe {
+        Some(defi_hot_wallet::crypto::QuantumSafeEncryption::new()?)
+    } else {
+        None
+    };
+    defi_hot_wallet::crypto::init_global_validator(quantum_crypto)?;
 
     match args.command {
         Some(Commands::Server { port }) => {
@@ -127,6 +156,6 @@ fn create_wallet_file(name: &str, output: &PathBuf) -> Result<()> {
         fs::create_dir_all(parent)?;
     }
     fs::write(output, serde_json::to_vec_pretty(&json)?)?;
-    println!("Wallet {} created successfully at {}", name, output.to_string_lossy());
+    tracing::info!("Wallet {} created successfully at {}", name, output.to_string_lossy());
     Ok(())
 }

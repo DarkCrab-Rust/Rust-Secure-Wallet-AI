@@ -36,6 +36,23 @@ pub struct BlockchainConfig {
     pub default_network: Option<String>,
 }
 
+/// Per-network derivation path overrides (BIP-44/SLIP-0010 style: account/change/index).
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct DerivationPathConfig {
+    /// Account index (hardened for both ETH and SOL per standards)
+    pub account: u32,
+    /// Change level (ETH: non-hardened 0 external/1 internal; SOL: treated hardened)
+    pub change: u32,
+    /// Address index (ETH: non-hardened; SOL: treated hardened)
+    pub index: u32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct DerivationConfig {
+    pub eth: DerivationPathConfig,
+    pub solana: DerivationPathConfig,
+}
+
 /// Main wallet configuration.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WalletConfig {
@@ -43,6 +60,9 @@ pub struct WalletConfig {
     pub blockchain: BlockchainConfig,
     pub quantum_safe: bool,
     pub multi_sig_threshold: u8,
+    /// Optional derivation overrides; defaults to m/44'/60'/0'/0/0 and m/44'/501'/0'/0'/0'
+    #[serde(default)]
+    pub derivation: DerivationConfig,
 }
 
 impl Default for WalletConfig {
@@ -112,6 +132,7 @@ impl Default for WalletConfig {
             blockchain: BlockchainConfig { networks, default_network: Some("eth".to_string()) },
             quantum_safe: false,
             multi_sig_threshold: 2,
+            derivation: DerivationConfig::default(),
         }
     }
 }

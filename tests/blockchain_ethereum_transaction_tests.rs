@@ -5,6 +5,7 @@
 
 use defi_hot_wallet::blockchain::ethereum::*;
 use defi_hot_wallet::blockchain::traits::{BlockchainClient, TransactionStatus};
+use defi_hot_wallet::core::domain::PrivateKey;
 use ethers::prelude::*;
 use ethers::providers::{MockProvider, MockResponse, Provider};
 use ethers::types::U256;
@@ -42,10 +43,14 @@ async fn test_send_transaction_normal() {
     mock_provider.push_response(MockResponse::Value(json!(U256::from(20_000_000_000u64))));
 
     let private_key = [1u8; 32]; // A non-zero private key
+    let pk = PrivateKey::try_from_slice(&private_key).expect("valid pk");
     let to_address = "0x742d35Cc6634C0532925a3b844Bc454e4438f44e";
     let amount = "0.01";
 
-    let result_tx_hash = client.send_transaction(&private_key, to_address, amount).await.unwrap();
+    let result_tx_hash: String =
+        EthereumClient::<MockProvider>::send_transaction(&client, &pk, to_address, amount)
+            .await
+            .unwrap();
     assert_eq!(result_tx_hash, format!("{:?}", tx_hash));
 }
 
@@ -62,10 +67,14 @@ async fn test_send_transaction_zero_amount() {
     mock_provider.push_response(MockResponse::Value(json!(U256::from(20_000_000_000u64))));
 
     let private_key = [1u8; 32];
+    let pk = PrivateKey::try_from_slice(&private_key).expect("valid pk");
     let to_address = "0x742d35Cc6634C0532925a3b844Bc454e4438f44e";
     let amount = "0.0"; // Zero amount
 
-    let result_tx_hash = client.send_transaction(&private_key, to_address, amount).await.unwrap();
+    let result_tx_hash: String =
+        EthereumClient::<MockProvider>::send_transaction(&client, &pk, to_address, amount)
+            .await
+            .unwrap();
     assert_eq!(result_tx_hash, format!("{:?}", tx_hash));
 }
 
@@ -82,10 +91,14 @@ async fn test_send_transaction_max_amount() {
     mock_provider.push_response(MockResponse::Value(json!(U256::from(20_000_000_000u64))));
 
     let private_key = [1u8; 32];
+    let pk = PrivateKey::try_from_slice(&private_key).expect("valid pk");
     let to_address = "0x742d35Cc6634C0532925a3b844Bc454e4438f44e";
     let amount = "1000.0"; // 1000 ETH
 
-    let result_tx_hash = client.send_transaction(&private_key, to_address, amount).await.unwrap();
+    let result_tx_hash: String =
+        EthereumClient::<MockProvider>::send_transaction(&client, &pk, to_address, amount)
+            .await
+            .unwrap();
     assert_eq!(result_tx_hash, format!("{:?}", tx_hash));
 }
 
@@ -106,25 +119,24 @@ async fn test_send_transaction_duplicate_tx() {
     mock_provider.push_response(MockResponse::Value(json!(U256::from(20_000_000_000u64))));
 
     let private_key = [1u8; 32];
+    let pk = PrivateKey::try_from_slice(&private_key).expect("valid pk");
     let to_address = "0x742d35Cc6634C0532925a3b844Bc454e4438f44e";
     let amount = "0.01";
 
     // Send twice (simulate duplicate)
-    let result1 = client.send_transaction(&private_key, to_address, amount).await.unwrap();
-    let result2 = client.send_transaction(&private_key, to_address, amount).await.unwrap();
+    let result1: String = client.send_transaction(&pk, to_address, amount).await.unwrap();
+    let result2: String = client.send_transaction(&pk, to_address, amount).await.unwrap();
     assert_eq!(result1, result2); // The mock returns the same hash, but the nonce was different.
 }
 
 #[tokio::test]
 async fn test_send_transaction_invalid_private_key_length() {
-    let (client, _) = create_mock_client();
+    let (_client, _) = create_mock_client();
 
     let private_key = [1u8; 31]; // Invalid length (should be 32)
-    let to_address = "0x742d35Cc6634C0532925a3b844Bc454e4438f44e";
-    let amount = "0.01";
-
-    let result = client.send_transaction(&private_key, to_address, amount).await;
-    assert!(result.is_err());
+                                 // Construction of PrivateKey should fail for invalid length
+    let try_pk = PrivateKey::try_from_slice(&private_key);
+    assert!(try_pk.is_err());
 }
 
 #[tokio::test]
@@ -132,10 +144,11 @@ async fn test_send_transaction_invalid_to_address() {
     let (client, _) = create_mock_client();
 
     let private_key = [1u8; 32];
+    let pk = PrivateKey::try_from_slice(&private_key).expect("valid pk");
     let to_address = "invalid";
     let amount = "0.01";
 
-    let result = client.send_transaction(&private_key, to_address, amount).await;
+    let result = client.send_transaction(&pk, to_address, amount).await;
     assert!(result.is_err());
 }
 
@@ -144,10 +157,11 @@ async fn test_send_transaction_invalid_amount() {
     let (client, _) = create_mock_client();
 
     let private_key = [1u8; 32];
+    let pk = PrivateKey::try_from_slice(&private_key).expect("valid pk");
     let to_address = "0x742d35Cc6634C0532925a3b844Bc454e4438f44e";
     let amount = "invalid";
 
-    let result = client.send_transaction(&private_key, to_address, amount).await;
+    let result = client.send_transaction(&pk, to_address, amount).await;
     assert!(result.is_err());
 }
 
@@ -156,11 +170,12 @@ async fn test_send_transaction_empty_private_key() {
     let (client, _) = create_mock_client();
 
     let private_key = [0u8; 32]; // All zeros
+    let pk = PrivateKey::try_from_slice(&private_key).expect("valid pk");
     let to_address = "0x742d35Cc6634C0532925a3b844Bc454e4438f44e";
     let amount = "0.01";
 
-    let result = client.send_transaction(&private_key, to_address, amount).await;
-    assert!(result.is_err()); // Should fail due to invalid private key
+    let result = client.send_transaction(&pk, to_address, amount).await;
+    assert!(result.is_err()); // Should fail due to invalid private key content
 }
 
 #[tokio::test]
@@ -175,11 +190,12 @@ async fn test_send_transaction_same_address() {
     mock_provider.push_response(MockResponse::Value(json!(U256::from(42))));
     mock_provider.push_response(MockResponse::Value(json!(U256::from(20_000_000_000u64))));
     let private_key = [1u8; 32];
+    let pk = PrivateKey::try_from_slice(&private_key).expect("valid pk");
     let to_address = "0x14791697260E4c9A71f18484C9f997B308e59325"; // Address for private_key [1u8; 32]
     let amount = "0.01";
 
     // This might succeed or fail depending on implementation; for coverage, call it
-    let result = client.send_transaction(&private_key, to_address, amount).await;
+    let result = client.send_transaction(&pk, to_address, amount).await;
     // Assuming it succeeds in mock
     assert!(result.is_ok());
 }
@@ -195,10 +211,11 @@ async fn test_send_transaction_large_amount() {
     mock_provider.push_response(MockResponse::Value(json!(U256::from(42))));
     mock_provider.push_response(MockResponse::Value(json!(U256::from(20_000_000_000u64))));
     let private_key = [1u8; 32];
+    let pk = PrivateKey::try_from_slice(&private_key).expect("valid pk");
     let to_address = "0x742d35Cc6634C0532925a3b844Bc454e4438f44e";
     let amount = "1000000.0"; // Large amount
 
-    let result_tx_hash = client.send_transaction(&private_key, to_address, amount).await.unwrap();
+    let result_tx_hash = client.send_transaction(&pk, to_address, amount).await.unwrap();
     assert_eq!(result_tx_hash, format!("{:?}", tx_hash));
 }
 
@@ -207,10 +224,11 @@ async fn test_send_transaction_negative_amount() {
     let (client, _) = create_mock_client();
 
     let private_key = [1u8; 32];
+    let pk = PrivateKey::try_from_slice(&private_key).expect("valid pk");
     let to_address = "0x742d35Cc6634C0532925a3b844Bc454e4438f44e";
     let amount = "-0.01";
 
-    let result = client.send_transaction(&private_key, to_address, amount).await;
+    let result = client.send_transaction(&pk, to_address, amount).await;
     assert!(result.is_err());
 }
 
@@ -219,10 +237,11 @@ async fn test_send_transaction_empty_amount() {
     let (client, _) = create_mock_client();
 
     let private_key = [1u8; 32];
+    let pk = PrivateKey::try_from_slice(&private_key).expect("valid pk");
     let to_address = "0x742d35Cc6634C0532925a3b844Bc454e4438f44e";
     let amount = "";
 
-    let result = client.send_transaction(&private_key, to_address, amount).await;
+    let result = client.send_transaction(&pk, to_address, amount).await;
     assert!(result.is_err());
 }
 
@@ -238,10 +257,11 @@ async fn test_send_transaction_with_custom_gas() {
     mock_provider.push_response(MockResponse::Value(json!(U256::from(42))));
     mock_provider.push_response(MockResponse::Value(json!(U256::from(30_000_000_000u64)))); // Higher gas price
     let private_key = [1u8; 32];
+    let pk = PrivateKey::try_from_slice(&private_key).expect("valid pk");
     let to_address = "0x742d35Cc6634C0532925a3b844Bc454e4438f44e";
     let amount = "0.01";
 
-    let result_tx_hash = client.send_transaction(&private_key, to_address, amount).await.unwrap();
+    let result_tx_hash = client.send_transaction(&pk, to_address, amount).await.unwrap();
     assert_eq!(result_tx_hash, format!("{:?}", tx_hash));
 }
 
@@ -250,10 +270,11 @@ async fn test_send_transaction_with_empty_to_address() {
     let (client, _) = create_mock_client();
 
     let private_key = [1u8; 32];
+    let pk = PrivateKey::try_from_slice(&private_key).expect("valid pk");
     let to_address = "";
     let amount = "0.01";
 
-    let result = client.send_transaction(&private_key, to_address, amount).await;
+    let result = client.send_transaction(&pk, to_address, amount).await;
     assert!(result.is_err());
 }
 
@@ -270,10 +291,12 @@ async fn test_send_transaction_with_max_private_key() {
     mock_provider.push_response(MockResponse::Value(json!(U256::from(20_000_000_000u64))));
     // Use a valid private key
     let private_key = [1u8; 32];
+    let pk =
+        defi_hot_wallet::core::domain::PrivateKey::try_from_slice(&private_key).expect("valid pk");
     let to_address = "0x742d35Cc6634C0532925a3b844Bc454e4438f44e";
     let amount = "0.01";
 
-    let result_tx_hash = client.send_transaction(&private_key, to_address, amount).await.unwrap();
+    let result_tx_hash = client.send_transaction(&pk, to_address, amount).await.unwrap();
     assert_eq!(result_tx_hash, format!("{:?}", tx_hash));
 }
 
@@ -289,10 +312,12 @@ async fn test_send_transaction_with_various_amounts() {
     mock_provider.push_response(MockResponse::Value(json!(U256::from(42))));
     mock_provider.push_response(MockResponse::Value(json!(U256::from(20_000_000_000u64))));
     let private_key = [1u8; 32];
-    let to_address = "0x742d35Cc6634C0532925a3b844Bc454e4438f44e";
+    let pk =
+        defi_hot_wallet::core::domain::PrivateKey::try_from_slice(&private_key).expect("valid pk");
+    let to_address = "0x742d35Cc6634C0532925a3b844Cc454e4438f44e";
     let amount = "0.001"; // Small amount
 
-    let result_tx_hash = client.send_transaction(&private_key, to_address, amount).await.unwrap();
+    let result_tx_hash = client.send_transaction(&pk, to_address, amount).await.unwrap();
     assert_eq!(result_tx_hash, format!("{:?}", tx_hash));
 }
 
@@ -307,10 +332,12 @@ async fn test_send_transaction_with_various_private_keys() {
     mock_provider.push_response(MockResponse::Value(json!(U256::from(42))));
     mock_provider.push_response(MockResponse::Value(json!(U256::from(20_000_000_000u64))));
     let private_key = [2u8; 32]; // Different private key
-    let to_address = "0x742d35Cc6634C0532925a3b844Bc454e4438f44e";
+    let pk =
+        defi_hot_wallet::core::domain::PrivateKey::try_from_slice(&private_key).expect("valid pk");
+    let to_address = "0x742d35Cc6634C0532925a3b844Cc454e4438f44e";
     let amount = "0.01";
 
-    let result_tx_hash = client.send_transaction(&private_key, to_address, amount).await.unwrap();
+    let result_tx_hash = client.send_transaction(&pk, to_address, amount).await.unwrap();
     assert_eq!(result_tx_hash, format!("{:?}", tx_hash));
 }
 
@@ -325,10 +352,12 @@ async fn test_send_transaction_with_various_gas_prices() {
     mock_provider.push_response(MockResponse::Value(json!(U256::from(42))));
     mock_provider.push_response(MockResponse::Value(json!(U256::from(20_000_000_000u64))));
     let private_key = [1u8; 32];
-    let to_address = "0x742d35Cc6634C0532925a3b844Bc454e4438f44e";
+    let pk =
+        defi_hot_wallet::core::domain::PrivateKey::try_from_slice(&private_key).expect("valid pk");
+    let to_address = "0x742d35Cc6634C0532925a3b844Cc454e4438f44e";
     let amount = "0.01";
 
-    let result_tx_hash = client.send_transaction(&private_key, to_address, amount).await.unwrap();
+    let result_tx_hash = client.send_transaction(&pk, to_address, amount).await.unwrap();
     assert_eq!(result_tx_hash, format!("{:?}", tx_hash));
 }
 
@@ -343,10 +372,11 @@ async fn test_send_transaction_with_various_to_addresses() {
     mock_provider.push_response(MockResponse::Value(json!(U256::from(42))));
     mock_provider.push_response(MockResponse::Value(json!(U256::from(20_000_000_000u64))));
     let private_key = [1u8; 32];
+    let pk = PrivateKey::try_from_slice(&private_key).expect("valid pk");
     let to_address = "0x1234567890123456789012345678901234567890"; // Different address
     let amount = "0.01";
 
-    let result_tx_hash = client.send_transaction(&private_key, to_address, amount).await.unwrap();
+    let result_tx_hash = client.send_transaction(&pk, to_address, amount).await.unwrap();
     assert_eq!(result_tx_hash, format!("{:?}", tx_hash));
 }
 
@@ -362,10 +392,11 @@ async fn test_send_transaction_with_various_combinations() {
     mock_provider.push_response(MockResponse::Value(json!(U256::from(43)))); // Different nonce
     mock_provider.push_response(MockResponse::Value(json!(U256::from(25_000_000_000u64)))); // Different gas price
     let private_key = [3u8; 32]; // Different key
-    let to_address = "0x742d35Cc6634C0532925a3b844Bc454e4438f44e";
+    let pk = PrivateKey::try_from_slice(&private_key).expect("valid pk");
+    let to_address = "0x742d35Cc6634C0532925a3b844Cc454e4438f44e";
     let amount = "0.02"; // Different amount
 
-    let result_tx_hash = client.send_transaction(&private_key, to_address, amount).await.unwrap();
+    let result_tx_hash = client.send_transaction(&pk, to_address, amount).await.unwrap();
     assert_eq!(result_tx_hash, format!("{:?}", tx_hash));
 }
 
@@ -376,10 +407,10 @@ async fn test_send_transaction_with_various_edge_cases() {
     // Use invalid private key
     // A key of all zeros is considered invalid by the `ethers` library.
     let invalid_private_key = [0u8; 32];
+    let pk = PrivateKey::try_from_slice(&invalid_private_key).expect("valid pk");
 
-    let result = client
-        .send_transaction(&invalid_private_key, "0x742d35Cc6634C0532925a3b844Bc454e4438f44e", "0.1")
-        .await;
+    let result =
+        client.send_transaction(&pk, "0x742d35Cc6634C0532925a3b844Cc454e4438f44e", "0.1").await;
     assert!(result.is_err()); // Check that the error is handled correctly
     assert!(result.unwrap_err().to_string().contains("Invalid private key"));
 }
@@ -396,10 +427,12 @@ async fn test_send_transaction_with_various_scenarios() {
     mock_provider.push_response(MockResponse::Value(json!(U256::from(100)))); // High nonce
     mock_provider.push_response(MockResponse::Value(json!(U256::from(50_000_000_000u64)))); // High gas price
     let private_key = [100u8; 32]; // Arbitrary key
-    let to_address = "0x742d35Cc6634C0532925a3b844Bc454e4438f44e";
+    let pk =
+        defi_hot_wallet::core::domain::PrivateKey::try_from_slice(&private_key).expect("valid pk");
+    let to_address = "0x742d35Cc6634C0532925a3b844Cc454e4438f44e";
     let amount = "1.0";
 
-    let result_tx_hash = client.send_transaction(&private_key, to_address, amount).await.unwrap();
+    let result_tx_hash = client.send_transaction(&pk, to_address, amount).await.unwrap();
     assert_eq!(result_tx_hash, format!("{:?}", tx_hash));
 }
 
@@ -416,10 +449,12 @@ async fn test_send_transaction_with_various_inputs() {
     mock_provider.push_response(MockResponse::Value(json!(U256::from(20_000_000_000u64))));
 
     let private_key = [1u8; 32];
-    let to_address = "0x742d35Cc6634C0532925a3b844Bc454e4438f44e";
+    let pk =
+        defi_hot_wallet::core::domain::PrivateKey::try_from_slice(&private_key).expect("valid pk");
+    let to_address = "0x742d35Cc6634C0532925a3b844Cc454e4438f44e";
     let amount = "0.00001";
 
-    let result_tx_hash = client.send_transaction(&private_key, to_address, amount).await.unwrap();
+    let result_tx_hash = client.send_transaction(&pk, to_address, amount).await.unwrap();
     assert_eq!(result_tx_hash, format!("{:?}", tx_hash));
 }
 
@@ -718,10 +753,12 @@ async fn test_send_transaction_with_invalid_provider() {
     mock_provider.push_response(MockResponse::Error(rpc_error));
 
     let private_key = [1u8; 32];
-    let to_address = "0x742d35Cc6634C0532925a3b844Bc454e4438f44e";
+    let pk =
+        defi_hot_wallet::core::domain::PrivateKey::try_from_slice(&private_key).expect("valid pk");
+    let to_address = "0x742d35Cc6634C0532925a3b844Cc454e4438f44e";
     let amount = "0.01";
 
-    let result = client.send_transaction(&private_key, to_address, amount).await;
+    let result = client.send_transaction(&pk, to_address, amount).await;
     assert!(result.is_err());
 }
 

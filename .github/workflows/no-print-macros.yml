@@ -1,0 +1,25 @@
+name: No Print Macros Check
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Scan for println!/eprintln!/dbg!
+        run: |
+          set -euo pipefail
+          # Exclude top-level tests/ directory, build.rs, src/bin/* and files ending with _tests.rs under src/
+          files=$(git ls-files '*.rs' | grep -v '^tests/' | grep -vE '_tests.rs$' | grep -v '^.github/' | grep -v '^build.rs' | grep -v '^src/bin/' || true)
+          if [ -n "$files" ]; then
+            if grep -nE 'println\\!|eprintln\\!|dbg\\!' $files; then
+              echo "Found print macros in non-test code."
+              exit 1
+            fi
+          fi

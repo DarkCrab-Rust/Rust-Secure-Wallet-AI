@@ -36,9 +36,15 @@ async fn build_test_server() -> TestServer {
     env::set_var("TEST_SKIP_DECRYPT", "1");
 
     let cfg = make_test_config();
-    let api_key = Some("env_test_key".to_string());
+    let api_key = Some(zeroize::Zeroizing::new("env_test_key".as_bytes().to_vec()));
     // Provide a test master key to avoid decrypt attempts in handlers
-    let srv = WalletServer::new_for_test("127.0.0.1".to_string(), 0, cfg, api_key.clone(), Some(vec![0u8; 32]))
+    let srv = WalletServer::new_for_test(
+        "127.0.0.1".to_string(),
+        0,
+        cfg,
+        api_key.clone(),
+    Some(defi_hot_wallet::security::secret::vec_to_secret(std::iter::repeat_n(0u8, 32).collect::<Vec<u8>>())),
+    )
         .await
         .expect("create WalletServer for test");
     TestServer::new(srv.create_router().await).expect("create TestServer")
@@ -133,7 +139,9 @@ async fn test_backup_delete_restore_cycle_with_env_flags() {
         .await;
     assert_eq!(b.status_code(), StatusCode::OK);
     let body: Value = b.json();
-    let seed = body["seed_phrase"].as_str().unwrap_or("").to_string();
+    // test-env returns plaintext wrapped in ciphertext with alg==PLAINTEXT
+    assert_eq!(body["alg"], "PLAINTEXT");
+    let seed = body["ciphertext"].as_str().unwrap_or("").to_string();
     assert!(!seed.is_empty());
 
     // delete

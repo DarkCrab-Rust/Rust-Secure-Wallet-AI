@@ -389,7 +389,7 @@ mod tests {
                     assert!(unlock_res.is_ok(), "Unlocking should succeed if locking succeeded.");
                 }
                 Err(e) => {
-                    println!("Note: Memory locking failed with OS error: {}. This is often expected in test environments without special privileges.", e);
+                    tracing::debug!("Note: Memory locking failed with OS error: {}. This is often expected in test environments without special privileges.", e);
                 }
             }
         } else {

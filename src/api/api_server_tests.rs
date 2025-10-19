@@ -24,12 +24,13 @@ fn create_test_config() -> WalletConfig {
         },
         quantum_safe: false,
         multi_sig_threshold: 2,
+        derivation: Default::default(),
     }
 }
 
 async fn create_test_server() -> TestServer {
     let config = create_test_config();
-    let api_key = Some("test_api_key".to_string());
+    let api_key = Some(zeroize::Zeroizing::new("test_api_key".as_bytes().to_vec()));
     let server = WalletServer::new("127.0.0.1".to_string(), 0, config, api_key).await.unwrap();
     TestServer::new(server.create_router().await).unwrap()
 }
@@ -352,7 +353,8 @@ async fn history_and_backup_and_restore_branches() {
         .await;
     assert_eq!(r5.status_code(), StatusCode::OK);
     let b: Value = r5.json();
-    assert!(!b["seed_phrase"].as_str().unwrap_or("").is_empty());
+    assert!(b["ciphertext"].is_string());
+    assert_eq!(b["alg"], "PLAINTEXT");
 
     // restore
     let payload = json!({ "name": format!("rest_{}", Uuid::new_v4().simple()), "seed_phrase": "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about", "quantum_safe": false });
@@ -374,7 +376,8 @@ async fn test_backup_wallet() {
         .await;
     assert_eq!(response.status_code(), StatusCode::OK);
     let body: serde_json::Value = response.json();
-    assert!(body["seed_phrase"].is_string());
+        assert!(body["ciphertext"].is_string());
+        assert_eq!(body["alg"], "PLAINTEXT");
 }
 
 #[tokio::test]

@@ -7,6 +7,7 @@ on:
     branches: [ main ]
   schedule:
     - cron: '0 3 * * 1'
+  workflow_dispatch:
 
 jobs:
   audit:
@@ -19,6 +20,8 @@ jobs:
           toolchain: stable
           override: true
       - name: Install cargo-audit
-        run: cargo install cargo-audit
-      - name: Run cargo audit (non-blocking)
-        run: cargo audit || echo "cargo audit reported issues (non-blocking)"
+        run: cargo install --locked cargo-audit
+      - name: Ensure optional features (pkcs11) are present in lockfile
+        run: cargo build --workspace --features "pkcs11 pkcs11-backend" --quiet
+      - name: Run cargo audit (blocking)
+        run: cargo audit

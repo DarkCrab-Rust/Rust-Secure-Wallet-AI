@@ -25,9 +25,21 @@ TEMP*.txt
 build/
 node_modules/
 dist/
-tests/
 logs/
 .git/
+logs/
+.git/
+
+# Allow only specific folders
+!src/
+!contracts/
+!scripts/
+!README.md
+# Test artifacts we never commit
+target_test_*
+target/**/target_test_*
+.idea/
+.vscode/
 
 # Allow only specific folders
 !src/

@@ -40,9 +40,9 @@ fn create_test_config() -> WalletConfig {
 async fn create_test_server() -> TestServer {
     ensure_addl_test_env();
     let config = create_test_config();
-    let api_key = Some("test_api_key".to_string());
+    let api_key = Some(zeroize::Zeroizing::new("test_api_key".as_bytes().to_vec()));
     // Provide a deterministic test master key so load/decrypt works in tests
-    let test_master_key = Some(vec![0u8; 32]);
+    let test_master_key = Some(defi_hot_wallet::security::secret::vec_to_secret(std::iter::repeat_n(0u8, 32).collect::<Vec<u8>>()));
     let server = WalletServer::new_for_test(
         "127.0.0.1".to_string(),
         0,
@@ -95,7 +95,8 @@ async fn test_backup_then_restore_cycle_using_seed() {
         .await;
     assert_eq!(b.status_code(), StatusCode::OK);
     let body: Value = b.json();
-    let seed = body["seed_phrase"].as_str().unwrap_or("").to_string();
+    assert_eq!(body["alg"], "PLAINTEXT");
+    let seed = body["ciphertext"].as_str().unwrap_or("").to_string();
     assert!(!seed.is_empty(), "seed_phrase must be present");
 
     // restore to new name

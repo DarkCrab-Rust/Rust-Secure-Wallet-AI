@@ -1,17 +1,17 @@
 use defi_hot_wallet::blockchain::ethereum::EthereumClient;
 use defi_hot_wallet::blockchain::BlockchainClient;
+use defi_hot_wallet::core::domain::PrivateKey;
 use ethers::providers::{Http, Provider};
 use std::convert::TryFrom;
 
 #[tokio::test(flavor = "current_thread")]
 async fn send_transaction_invalid_key_errors() {
     let provider = Provider::<Http>::try_from("http://127.0.0.1:8545").unwrap();
-    let client = EthereumClient::new_with_provider(provider);
+    let _client = EthereumClient::new_with_provider(provider);
     let short_key = [0u8; 16];
-    let res = client
-        .send_transaction(&short_key, "0x0000000000000000000000000000000000000000", "0.01")
-        .await;
-    assert!(res.is_err());
+    // PrivateKey construction should fail for an invalid-length key
+    let try_pk = PrivateKey::try_from_slice(&short_key);
+    assert!(try_pk.is_err());
 }
 
 #[test]

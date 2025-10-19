@@ -1,0 +1,36 @@
+name: Rust Check
+
+on:
+  push:
+    branches:
+      - '**'
+  workflow_dispatch:
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 安装 Rust (stable)
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+
+      - name: 安装 cargo-audit
+        run: cargo install cargo-audit
+
+      - name: 扫漏洞 (cargo audit)
+        run: cargo audit
+
+      - name: Setup and run Miri (nightly)
+        run: |
+          # Install nightly toolchain and add miri to that toolchain. miri
+          # is not always available for the latest stable channel; running it
+          # on nightly avoids rustup/component availability errors.
+          rustup toolchain install nightly || true
+          rustup component add miri --toolchain nightly
+          cargo +nightly miri setup
+          cargo +nightly miri test

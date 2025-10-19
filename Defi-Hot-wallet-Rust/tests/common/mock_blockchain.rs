@@ -19,7 +19,7 @@ impl BlockchainClient for MockBlockchainClient {
         Ok("100".to_string())
     }
 
-    async fn send_transaction(&self, _private_key: &[u8], _to_address: &str, _amount: &str) -> Result<String, String> {
+    async fn send_transaction(&self, _private_key: &crate::core::domain::PrivateKey, _to_address: &str, _amount: &str) -> Result<String, String> {
         Ok("tx_hash".to_string())
     }
 }

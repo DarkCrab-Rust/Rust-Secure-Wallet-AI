@@ -16,6 +16,8 @@ use std::env;
 use std::sync::Arc;
 use tokio::task;
 use uuid::Uuid;
+use crate::security::redaction::redact_body;
+use tracing::info;
 
 fn make_config() -> WalletConfig {
     WalletConfig {
@@ -30,6 +32,7 @@ fn make_config() -> WalletConfig {
         },
         quantum_safe: false,
         multi_sig_threshold: 1,
+        derivation: Default::default(),
     }
 }
 
@@ -53,17 +56,22 @@ async fn build_server_with_env(api_key: &str, force_mock: bool) -> TestServer {
     }
 
     let cfg = make_config();
-    let api_key_opt = Some(api_key.to_string());
+    let api_key_opt = Some(zeroize::Zeroizing::new(api_key.as_bytes().to_vec()));
     // Provide deterministic master key to avoid decrypt attempts during tests
     let server = WalletServer::new_for_test(
         "127.0.0.1".to_string(),
         0,
         cfg,
         api_key_opt,
-        Some(vec![0u8; 32]),
+        Some(zeroize::Zeroizing::new(vec![0u8; 32])),
     )
     .await
     .expect("create server");
+    // Initialize tracing for tests so we capture structured logs rather than
+    // relying on stderr prints. Tests can still opt-in to secrets via
+    // DEV_PRINT_SECRETS if necessary.
+    let _ = tracing_subscriber::fmt().try_init();
+
     TestServer::new(server.create_router().await).expect("create TestServer")
 }
 
@@ -150,7 +158,7 @@ async fn bridge_succeeds_with_mock_and_existing_wallet() {
         .await;
 
     if res.status_code() != StatusCode::OK {
-        eprintln!("BRIDGE_DBG: {} body: {}", res.status_code(), res.text());
+        tracing::error!(status = %res.status_code(), body = %redact_body(&res.text()), "bridge request failed");
     }
     assert_eq!(res.status_code(), StatusCode::OK);
     let j: Value = res.json();
@@ -191,7 +199,7 @@ async fn bridge_concurrent_requests_with_mock() {
     let results = join_all(futs).await;
     for res in results {
         if res.status_code() != StatusCode::OK {
-            eprintln!("CONCUR_DBG: {} body: {}", res.status_code(), res.text());
+            tracing::error!(status = %res.status_code(), body = %redact_body(&res.text()), "concurrent bridge request failed");
         }
         assert_eq!(res.status_code(), StatusCode::OK);
         let j: Value = res.json();

@@ -11,7 +11,13 @@ fn test_env_config_load_with_values() {
     };
     let blockchain =
         BlockchainConfig { networks: HashMap::new(), default_network: Some("eth".to_string()) };
-    let cfg = WalletConfig { storage, blockchain, quantum_safe: false, multi_sig_threshold: 1 };
+    let cfg = WalletConfig {
+        storage,
+        blockchain,
+        quantum_safe: false,
+        multi_sig_threshold: 1,
+        derivation: Default::default(),
+    };
 
     assert_eq!(cfg.storage.database_url, "sqlite::memory:");
     assert_eq!(cfg.blockchain.default_network.as_deref(), Some("eth"));
