@@ -38,6 +38,12 @@ fn hot_wallet_refuses_insecure_kek_in_prod() {
     let mut run = Command::new(bin_path);
     run.arg("server");
     run.env("WALLET_ENC_KEY", zeros_b64);
+    // Ensure the child process truly simulates a production binary by removing
+    // any test-only runtime overrides that CI may set (e.g. TEST_SKIP_DECRYPT).
+    // If TEST_SKIP_DECRYPT is present in the parent environment (CI/jobs), the
+    // binary will bail earlier with a different message and this test will
+    // not exercise the insecure-key code path we want to assert on.
+    run.env_remove("TEST_SKIP_DECRYPT");
 
     let output = run.output().expect("failed to spawn hot_wallet binary");
     // The process should exit non-zero (refused to start)
