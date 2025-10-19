@@ -9,10 +9,9 @@ fn test_cli_encrypted_mnemonic_export_roundtrip() {
     let out_path = dir.path().join("mnemonic.enc");
 
     // 32-byte test key (generated securely per-test to avoid hard-coded literals)
-    use rand::RngCore;
+    use rand::random;
     use zeroize::Zeroize;
-    let mut key_bytes = [0u8; 32];
-    rand::rngs::OsRng.fill_bytes(&mut key_bytes);
+    let mut key_bytes: [u8; 32] = random();
     // avoid needless borrow and ensure key isn't accidentally copied for encoding
     // [u8;32] is Copy, so passing by value is fine and satisfies Clippy's lint
     let key_hex = hex::encode(key_bytes);
