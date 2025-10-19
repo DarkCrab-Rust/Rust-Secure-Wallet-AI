@@ -1188,8 +1188,11 @@ mod startup_guard_tests {
         env::set_var("BRIDGE_MOCK", "1");
 
         // Under test builds with feature `test-env`, mocks are allowed and guard wouldn't bail.
-        // So only assert true when not under test-env.
-        if !cfg!(feature = "test-env") {
+        // Also many test runners (and code coverage tools like tarpaulin) set
+        // `RUST_TEST_THREADS` which our bridge_mocks_allowed() treats as a
+        // signal to allow mocks. Avoid asserting the bail condition when
+        // either of those are present to prevent flaky CI failures.
+        if !cfg!(feature = "test-env") && std::env::var("RUST_TEST_THREADS").is_err() {
             assert!(startup_mock_guard_should_bail_for_env());
         }
 

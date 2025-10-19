@@ -54,6 +54,10 @@ async fn rotate_kek_success_and_idempotent() {
 
 #[tokio::test]
 async fn rotate_kek_missing_env_fails() {
+    // Ensure deterministic test environment (master KEK present). The test
+    // verifies that rotating to a *different* KEK id fails when that specific
+    // env isn't set; we still need a base WALLET_ENC_KEY for wallet creation.
+    util::set_test_env();
     let (wm, _storage) = setup_manager().await;
     let name = "rot8_missing";
     wm.create_wallet(name, false).await.expect("create wallet");
