@@ -203,4 +203,4 @@ path = "src/bin/bridge_test.rs"
 
 [patch.crates-io]
 # 使用本地补丁进行测试/构建
-elliptic-curve-tools = { path = "patches/elliptic-curve-tools" }
+elliptic-curve-tools = { path = "patches/elliptic-curve-tools" } 
