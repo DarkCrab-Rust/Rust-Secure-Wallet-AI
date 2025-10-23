@@ -1,0 +1,41 @@
+# 检查本地代码和GitHub仓库同步状态
+
+## 请在Git Bash中依次运行以下命令：
+
+# 1. 进入项目目录
+cd /c/Users/plant/Desktop/Rust区块链/Rust-Blockchain-Secure-Wallet
+
+# 2. 拉取GitHub最新信息
+git fetch origin main
+
+# 3. 查看当前分支
+git branch --show-current
+
+# 4. 比较本地main和远程main的差异（简短统计）
+git diff --shortstat main origin/main
+
+# 5. 比较当前分支和远程main的差异
+git diff --shortstat HEAD origin/main
+
+# 6. 查看不同的文件列表
+git diff --name-only HEAD origin/main
+
+# 7. 查看提交历史差异
+git log --oneline HEAD..origin/main
+
+# 8. 查看本地领先的提交
+git log --oneline origin/main..HEAD
+
+## 结果判断：
+
+如果命令4和5都没有输出 → 完全同步 ✅
+如果有输出 → 存在差异，需要同步 ⚠️
+
+## 同步方式：
+
+# 如果想用本地代码覆盖GitHub：
+git push origin main --force-with-lease
+
+# 如果想用GitHub代码覆盖本地：
+git reset --hard origin/main
+
