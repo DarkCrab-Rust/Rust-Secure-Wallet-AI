@@ -730,6 +730,37 @@ impl WalletManager {
             .transfer_across_chains(from_chain, to_chain, token, amount, &wallet_data)
             .await?;
 
+        // Build bridge transaction record and persist (best-effort)
+        let now = chrono::Utc::now();
+        let (fee_amount, estimated_completion_time) = match self.calculate_bridge_fee(from_chain, to_chain, token, amount) {
+            Ok((f, t)) => (Some(f), Some(t)),
+            Err(_) => (None, None),
+        };
+
+        let bt = BridgeTransaction {
+            id: tx_hash.clone(),
+            from_wallet: wallet_name.to_string(),
+            from_chain: from_chain.to_string(),
+            to_chain: to_chain.to_string(),
+            token: token.to_string(),
+            amount: amount.to_string(),
+            status: BridgeTransactionStatus::Initiated,
+            source_tx_hash: Some(tx_hash.clone()),
+            destination_tx_hash: None,
+            created_at: now,
+            updated_at: now,
+            fee_amount,
+            estimated_completion_time,
+        };
+
+        if let Err(e) = self.storage.store_bridge_transaction(&bt).await {
+            warn!("Failed to persist bridge transaction {}: {}", bt.id, e);
+            return Err(WalletError::StorageError(format!("Failed to persist bridge transaction {}: {}", bt.id, e)));
+        }
+
+        // Start background monitor for the bridge transaction
+        self.start_bridge_monitor(tx_hash.clone());
+
         // Zeroize ephemeral master key and any sensitive wallet buffers
         drop(master_key);
         wallet_data.zeroize();

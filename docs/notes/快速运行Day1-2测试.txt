@@ -1,0 +1,25 @@
+====================================================================
+快速运行 Day 1-2 测试
+====================================================================
+
+在 Git Bash 中运行:
+
+cd ~/Desktop/Rust区块链/Rust-Blockchain-Secure-Wallet
+
+# 运行 Day 1 测试
+cargo test --test week1_day1_wallet_core_tests -- --test-threads=20
+
+# 运行 Day 2 测试  
+cargo test --test week1_day2_wallet_backup_restore_tests -- --test-threads=20
+
+# 或者运行所有 Week 1 测试
+cargo test week1_ -- --test-threads=20
+
+====================================================================
+修复内容:
+- 添加了手动设置环境变量 (WALLET_ENC_KEY等)
+- 解决了 test_env ctor 在集成测试中不自动运行的问题
+
+现在应该能看到测试运行并通过了！
+====================================================================
+

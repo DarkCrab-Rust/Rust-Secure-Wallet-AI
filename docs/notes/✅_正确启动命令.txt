@@ -1,0 +1,29 @@
+✅ 正确启动命令 - Day 2
+
+问题解决：
+- ❌ cargo run --bin hot_wallet (错误)
+- ✅ cargo run --bin plant (正确)
+
+立即执行：
+
+Step 1: 启动服务器
+运行：
+cargo run --bin plant
+
+Step 2: 等待服务器启动
+看到以下信息表示成功：
+Server listening on 127.0.0.1:8888
+
+Step 3: 在新窗口测试
+curl http://localhost:8888/health
+
+Step 4: 重新启动自动化测试
+./week_automated_test.sh
+
+完整命令序列：
+1. cargo run --bin plant
+2. 等待启动完成
+3. 新窗口：curl http://localhost:8888/health
+4. 新窗口：./week_automated_test.sh
+
+注意：使用 --bin plant 而不是 --bin hot_wallet

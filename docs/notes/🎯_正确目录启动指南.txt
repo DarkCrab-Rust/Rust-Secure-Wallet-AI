@@ -1,0 +1,40 @@
+🎯 正确目录启动指南 - Day 2
+
+问题分析：
+- ❌ 你在错误的目录中 (C:\Users\plant)
+- ✅ 应该在正确目录中 (C:\Users\plant\Desktop\Rust区块链\Rust-Blockchain-Secure-Wallet)
+- ✅ 正确的二进制目标是 hot_wallet
+
+立即执行：
+
+Step 1: 切换到正确目录
+cd "C:\Users\plant\Desktop\Rust区块链\Rust-Blockchain-Secure-Wallet"
+
+Step 2: 验证目录正确
+pwd
+ls -la Cargo.toml
+
+Step 3: 启动服务器
+cargo run --bin hot_wallet
+
+Step 4: 等待服务器启动
+看到以下信息表示成功：
+Server listening on 127.0.0.1:8888
+
+Step 5: 在新窗口测试
+curl http://localhost:8888/health
+
+Step 6: 重新启动自动化测试
+./week_automated_test.sh
+
+完整命令序列：
+1. cd "C:\Users\plant\Desktop\Rust区块链\Rust-Blockchain-Secure-Wallet"
+2. cargo run --bin hot_wallet
+3. 等待启动完成
+4. 新窗口：curl http://localhost:8888/health
+5. 新窗口：./week_automated_test.sh
+
+关键点：
+- 必须在正确的项目目录中运行
+- 使用 --bin hot_wallet
+- 等待服务器完全启动

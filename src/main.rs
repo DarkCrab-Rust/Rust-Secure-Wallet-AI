@@ -25,7 +25,7 @@ enum Commands {
     /// Start the wallet server
     Server {
         /// Port to bind the server to
-        #[arg(long, default_value = "8080")]
+        #[arg(long, default_value = "8888")]
         port: u16,
     },
     /// Create a wallet file with the provided name at the given path
@@ -86,6 +86,12 @@ async fn main() -> Result<()> {
     let database_url = defi_hot_wallet::security::env_manager::secure_env::get_database_url()
         .unwrap_or_else(|_| "sqlite://./wallets.db".to_string());
 
+    // Load blockchain network configuration from config.toml or use defaults
+    let blockchain_config = load_blockchain_config().unwrap_or_else(|e| {
+        tracing::warn!("Failed to load config.toml: {}. Using default configuration", e);
+        create_default_blockchain_config()
+    });
+
     // A default configuration.
     let wallet_config = WalletConfig {
         storage: StorageConfig {
@@ -93,10 +99,7 @@ async fn main() -> Result<()> {
             max_connections: Some(10),
             connection_timeout_seconds: Some(30),
         },
-        blockchain: BlockchainConfig {
-            networks: HashMap::new(), // WalletManager will populate this
-            default_network: Some("eth".to_string()),
-        },
+        blockchain: blockchain_config,
         quantum_safe: false,
         multi_sig_threshold: 2,
         derivation: Default::default(),
@@ -106,7 +109,7 @@ async fn main() -> Result<()> {
     let api_key = defi_hot_wallet::security::env_manager::secure_env::get_api_key().ok();
 
     let server =
-        WalletServer::new("127.0.0.1".to_string(), 8080, wallet_config.clone(), api_key).await?;
+        WalletServer::new("127.0.0.1".to_string(), 8888, wallet_config.clone(), api_key).await?;
 
     // Initialize global encryption consistency validator
     let quantum_crypto = if wallet_config.quantum_safe {
@@ -123,8 +126,8 @@ async fn main() -> Result<()> {
             server_with_port.start().await?;
         }
         None => {
-            // Default behavior: start the server on 127.0.0.1:8080
-            info!("No command specified, starting server on default port 8080");
+            // Default behavior: start the server on 127.0.0.1:8888
+            info!("No command specified, starting server on default port 8888");
             server.start().await?;
         }
         // Create handled above
@@ -145,6 +148,132 @@ fn init_logging() -> Result<()> {
 
     tracing::subscriber::set_global_default(subscriber)?;
     Ok(())
+}
+
+/// Load blockchain configuration from config.toml
+fn load_blockchain_config() -> Result<BlockchainConfig> {
+    use defi_hot_wallet::core::config::NetworkConfig;
+    
+    let config_path = std::env::var("CONFIG_PATH").unwrap_or_else(|_| "config.toml".to_string());
+    let config_content = fs::read_to_string(&config_path)?;
+    let config: toml::Value = toml::from_str(&config_content)?;
+    
+    let mut networks = HashMap::new();
+    
+    if let Some(blockchain) = config.get("blockchain") {
+        if let Some(networks_table) = blockchain.get("networks").and_then(|v| v.as_table()) {
+            for (name, network_value) in networks_table {
+                if let Some(network_table) = network_value.as_table() {
+                    let rpc_url = network_table.get("rpc_url")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("")
+                        .to_string();
+                    
+                    let chain_id = network_table.get("chain_id")
+                        .and_then(|v| v.as_integer())
+                        .map(|v| v as u64);
+                    
+                    let native_token = network_table.get("native_token")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("UNKNOWN")
+                        .to_string();
+                    
+                    let block_time_seconds = network_table.get("block_time_seconds")
+                        .and_then(|v| v.as_integer())
+                        .unwrap_or(15) as u64;
+                    
+                    networks.insert(name.clone(), NetworkConfig {
+                        rpc_url,
+                        chain_id,
+                        native_token,
+                        block_time_seconds,
+                    });
+                    
+                    info!("Loaded network config: {} (RPC: {})", name, networks.get(name).unwrap().rpc_url);
+                }
+            }
+        }
+    }
+    
+    let default_network = config.get("blockchain")
+        .and_then(|v| v.get("default_network"))
+        .and_then(|v| v.as_str())
+        .map(|s| s.to_string());
+    
+    Ok(BlockchainConfig {
+        networks,
+        default_network,
+    })
+}
+
+/// Create default blockchain configuration for testnet
+fn create_default_blockchain_config() -> BlockchainConfig {
+    use defi_hot_wallet::core::config::NetworkConfig;
+    
+    let mut networks = HashMap::new();
+    
+    // Ethereum Mainnet
+    networks.insert("eth".to_string(), NetworkConfig {
+        rpc_url: "https://eth.llamarpc.com".to_string(),
+        chain_id: Some(1),
+        native_token: "ETH".to_string(),
+        block_time_seconds: 12,
+    });
+    
+    // Ethereum Sepolia Testnet
+    networks.insert("sepolia".to_string(), NetworkConfig {
+        rpc_url: "https://sepolia.drpc.org".to_string(),
+        chain_id: Some(11155111),
+        native_token: "ETH".to_string(),
+        block_time_seconds: 12,
+    });
+    
+    // Polygon
+    networks.insert("polygon".to_string(), NetworkConfig {
+        rpc_url: "https://polygon-rpc.com".to_string(),
+        chain_id: Some(137),
+        native_token: "MATIC".to_string(),
+        block_time_seconds: 2,
+    });
+    
+    // BSC
+    networks.insert("bsc".to_string(), NetworkConfig {
+        rpc_url: "https://bsc-dataseed.binance.org".to_string(),
+        chain_id: Some(56),
+        native_token: "BNB".to_string(),
+        block_time_seconds: 3,
+    });
+    
+    // BSC Testnet
+    networks.insert("bsctestnet".to_string(), NetworkConfig {
+        rpc_url: "https://data-seed-prebsc-1-s1.binance.org:8545".to_string(),
+        chain_id: Some(97),
+        native_token: "tBNB".to_string(),
+        block_time_seconds: 3,
+    });
+    
+    // Solana Mainnet
+    networks.insert("solana".to_string(), NetworkConfig {
+        rpc_url: "https://api.mainnet-beta.solana.com".to_string(),
+        chain_id: None,
+        native_token: "SOL".to_string(),
+        block_time_seconds: 1,
+    });
+    
+    // Solana Devnet
+    networks.insert("solana-devnet".to_string(), NetworkConfig {
+        rpc_url: "https://api.devnet.solana.com".to_string(),
+        chain_id: None,
+        native_token: "SOL".to_string(),
+        block_time_seconds: 1,
+    });
+    
+    info!("Using default blockchain configuration with {} networks", networks.len());
+    
+    BlockchainConfig {
+        networks,
+        default_network: Some("eth".to_string()),
+    }
 }
 
 fn create_wallet_file(name: &str, output: &PathBuf) -> Result<()> {

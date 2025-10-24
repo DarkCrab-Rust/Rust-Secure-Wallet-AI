@@ -12,7 +12,7 @@ use std::sync::Arc;
 use std::time::Duration;
 use tokio::net::TcpListener;
 use tower::{limit::ConcurrencyLimitLayer, timeout::TimeoutLayer, ServiceBuilder};
-use tower_http::{limit::RequestBodyLimitLayer, trace::TraceLayer};
+use tower_http::{limit::RequestBodyLimitLayer, trace::TraceLayer, cors::CorsLayer};
 
 use crate::api::handlers;
 use crate::api::types::*;
@@ -86,7 +86,14 @@ impl WalletServer {
 
     pub async fn create_router(self) -> Router {
         let state = Arc::new(self);
-        let base_router = Router::new()
+        
+        // SECURITY: Get CORS origin from environment variable (default: localhost:3000)
+        let cors_origin = std::env::var("CORS_ALLOW_ORIGIN")
+            .unwrap_or_else(|_| "http://localhost:3000".to_string());
+        
+        tracing::info!("CORS configured to allow origin: {}", cors_origin);
+        
+        let         base_router = Router::new()
             .route("/api/health", get(health_check))
             .route("/api/wallets", post(create_wallet).get(list_wallets))
             .route("/api/wallets/:name", delete(delete_wallet))
@@ -97,6 +104,14 @@ impl WalletServer {
             .route("/api/wallets/:name/rotate-signing-key", post(rotate_signing_key))
             .route("/api/wallets/:name/send_multi_sig", post(send_multi_sig_transaction))
             .route("/api/metrics", get(metrics))
+            .layer(
+                CorsLayer::new()
+                    .allow_origin(cors_origin.parse::<axum::http::HeaderValue>()
+                        .expect("Invalid CORS_ALLOW_ORIGIN environment variable"))
+                    .allow_methods([axum::http::Method::GET, axum::http::Method::POST, axum::http::Method::DELETE])
+                    .allow_headers([axum::http::header::AUTHORIZATION, axum::http::header::CONTENT_TYPE])
+                    .allow_credentials(true)
+            )
             .layer(
                 ServiceBuilder::new()
                     // Convert middleware errors (timeout/overload) into HTTP responses
@@ -120,6 +135,7 @@ impl WalletServer {
         let sensitive = Router::new()
             .route("/api/wallets/:name/send", post(send_transaction))
             .route("/api/bridge", post(bridge_assets))
+            .route("/api/bridge/:id", get(handlers::get_bridge_transaction))
             .layer(
                 ServiceBuilder::new()
                     .layer(HandleErrorLayer::new(|err: BoxError| async move {

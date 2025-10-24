@@ -1,0 +1,40 @@
+立即启动服务器 - Day 2
+
+问题：自动化测试失败，服务器未运行
+
+解决方案：
+
+Step 1: 停止当前自动化测试
+按 Ctrl+C 停止当前的自动化测试
+
+Step 2: 启动服务器
+在Git Bash中运行：
+```bash
+cd Rust-Blockchain-Secure-Wallet
+cargo run --bin hot_wallet
+```
+
+Step 3: 等待服务器启动
+看到以下信息表示启动成功：
+```
+Server listening on 127.0.0.1:8888
+```
+
+Step 4: 在新窗口测试
+```bash
+cd Rust-Blockchain-Secure-Wallet
+curl http://localhost:8888/health
+```
+
+Step 5: 重新启动自动化测试
+```bash
+chmod +x week_automated_test.sh
+./week_automated_test.sh
+```
+
+完整操作流程：
+1. 按 Ctrl+C 停止当前测试
+2. 运行 cargo run --bin hot_wallet
+3. 等待服务器启动
+4. 在新窗口运行测试
+5. 启动自动化测试

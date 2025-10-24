@@ -1,0 +1,51 @@
+🚀 立即执行命令 - Day 2
+
+问题：你在错误的目录中运行命令
+
+解决方案：
+
+Step 1: 切换到正确的目录
+```bash
+cd Rust-Blockchain-Secure-Wallet
+```
+
+Step 2: 验证文件存在
+```bash
+ls -la week_automated_test.sh
+```
+
+Step 3: 清理端口并启动服务器
+```bash
+chmod +x 清理端口并启动服务器.sh
+./清理端口并启动服务器.sh
+```
+
+Step 4: 等待服务器启动
+看到 "Server listening on 127.0.0.1:8888" 表示启动成功
+
+Step 5: 在新窗口测试健康检查
+```bash
+cd Rust-Blockchain-Secure-Wallet
+curl http://localhost:8888/health
+```
+
+Step 6: 启动自动化测试
+```bash
+chmod +x week_automated_test.sh
+./week_automated_test.sh
+```
+
+完整命令序列：
+```bash
+cd Rust-Blockchain-Secure-Wallet
+chmod +x 清理端口并启动服务器.sh
+./清理端口并启动服务器.sh
+```
+
+然后在新的Git Bash窗口：
+```bash
+cd Rust-Blockchain-Secure-Wallet
+curl http://localhost:8888/health
+chmod +x week_automated_test.sh
+./week_automated_test.sh
+```

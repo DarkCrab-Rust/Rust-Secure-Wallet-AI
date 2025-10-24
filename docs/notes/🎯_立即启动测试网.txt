@@ -1,0 +1,44 @@
+🚀 立即启动测试网 - 解决 "No such file or directory" 问题
+
+问题原因：
+你在 ~/Desktop/Rust区块链 目录，但 start_testnet.sh 在 Rust-Blockchain-Secure-Wallet 子目录中
+
+解决方案：
+
+方法1: 切换到正确目录
+```bash
+cd Rust-Blockchain-Secure-Wallet
+./start_testnet.sh
+```
+
+方法2: 使用完整路径
+```bash
+./Rust-Blockchain-Secure-Wallet/start_testnet.sh
+```
+
+方法3: 双击运行批处理文件
+双击 start_testnet_windows.bat
+
+方法4: 使用快速启动脚本
+```bash
+cd Rust-Blockchain-Secure-Wallet
+./快速启动测试网.sh
+```
+
+推荐步骤：
+1. 在Git Bash中运行：
+   cd Rust-Blockchain-Secure-Wallet
+   ./start_testnet.sh
+
+2. 等待服务器启动（约30秒）
+
+3. 在新窗口测试API：
+   curl http://localhost:8888/health
+
+4. 创建测试钱包：
+   curl -X POST http://localhost:8888/wallets \
+     -H "Authorization: Bearer testnet_api_key_xxxxx" \
+     -H "Content-Type: application/json" \
+     -d '{"name": "test_wallet", "description": "测试钱包"}'
+
+注意：服务器端口是8888，不是8080！

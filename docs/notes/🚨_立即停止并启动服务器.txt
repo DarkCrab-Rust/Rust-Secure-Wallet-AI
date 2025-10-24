@@ -1,0 +1,32 @@
+🚨 立即停止并启动服务器 - Day 2
+
+问题：自动化测试6个失败，服务器未运行
+
+立即执行：
+
+Step 1: 停止当前自动化测试
+按 Ctrl+C 停止自动化测试
+
+Step 2: 在Git Bash中启动服务器
+cargo run --bin hot_wallet
+
+Step 3: 等待服务器启动
+看到 "Server listening on 127.0.0.1:8888"
+
+Step 4: 在新窗口测试健康检查
+curl http://localhost:8888/health
+
+Step 5: 如果健康检查成功，重新启动自动化测试
+./week_automated_test.sh
+
+关键点：
+- 必须先启动服务器
+- 服务器启动需要时间
+- 看到 "Server listening" 表示成功
+
+完整流程：
+1. 按 Ctrl+C
+2. cargo run --bin hot_wallet
+3. 等待启动
+4. 新窗口测试
+5. 重新启动自动化测试

@@ -1,0 +1,207 @@
+{
+  "info": {
+    "name": "钱包API测试网测试",
+    "description": "用于测试网环境的完整API测试集合",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:8888",
+      "type": "string"
+    },
+    {
+      "key": "api_key",
+      "value": "testnet_api_key_change_in_production",
+      "type": "string"
+    },
+    {
+      "key": "wallet_name",
+      "value": "test_wallet_1",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "1. 健康检查",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/api/health",
+          "host": ["{{base_url}}"],
+          "path": ["api", "health"]
+        }
+      }
+    },
+    {
+      "name": "2. 创建钱包",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "{{api_key}}",
+            "type": "text"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"{{wallet_name}}\",\n  \"quantum_safe\": false\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/wallets",
+          "host": ["{{base_url}}"],
+          "path": ["api", "wallets"]
+        }
+      }
+    },
+    {
+      "name": "3. 列出所有钱包",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "{{api_key}}",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/api/wallets",
+          "host": ["{{base_url}}"],
+          "path": ["api", "wallets"]
+        }
+      }
+    },
+    {
+      "name": "4. 查询余额 (Sepolia)",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "{{api_key}}",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/api/wallets/{{wallet_name}}/balance?network=sepolia",
+          "host": ["{{base_url}}"],
+          "path": ["api", "wallets", "{{wallet_name}}", "balance"],
+          "query": [
+            {
+              "key": "network",
+              "value": "sepolia"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "5. 备份钱包",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "{{api_key}}",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/api/wallets/{{wallet_name}}/backup",
+          "host": ["{{base_url}}"],
+          "path": ["api", "wallets", "{{wallet_name}}", "backup"]
+        }
+      }
+    },
+    {
+      "name": "6. 查询交易历史",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "{{api_key}}",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/api/wallets/{{wallet_name}}/history",
+          "host": ["{{base_url}}"],
+          "path": ["api", "wallets", "{{wallet_name}}", "history"]
+        }
+      }
+    },
+    {
+      "name": "7. 发送交易",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "{{api_key}}",
+            "type": "text"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"to_address\": \"0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb\",\n  \"amount\": \"0.001\",\n  \"network\": \"sepolia\"\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/wallets/{{wallet_name}}/send",
+          "host": ["{{base_url}}"],
+          "path": ["api", "wallets", "{{wallet_name}}", "send"]
+        }
+      }
+    },
+    {
+      "name": "8. 查看系统指标",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "{{api_key}}",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/api/metrics",
+          "host": ["{{base_url}}"],
+          "path": ["api", "metrics"]
+        }
+      }
+    },
+    {
+      "name": "9. 删除钱包",
+      "request": {
+        "method": "DELETE",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "{{api_key}}",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/api/wallets/{{wallet_name}}",
+          "host": ["{{base_url}}"],
+          "path": ["api", "wallets", "{{wallet_name}}"]
+        }
+      }
+    }
+  ]
+}
+

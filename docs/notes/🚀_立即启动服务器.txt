@@ -1,0 +1,61 @@
+🚀 立即启动测试网服务器
+
+问题：健康检查失败，服务器未运行
+
+解决方案：
+
+方法1: 在Git Bash中直接启动
+```bash
+cd Rust-Blockchain-Secure-Wallet
+
+# 停止占用端口的进程
+taskkill //F //PID 25192 2>/dev/null || true
+
+# 等待端口释放
+sleep 3
+
+# 启动服务器
+cargo run --bin hot_wallet
+```
+
+方法2: 使用修复脚本
+```bash
+cd Rust-Blockchain-Secure-Wallet
+chmod +x 修复端口冲突.sh
+./修复端口冲突.sh
+```
+
+方法3: 使用环境变量启动
+```bash
+cd Rust-Blockchain-Secure-Wallet
+
+# 设置环境变量
+export WALLET_ENC_KEY="$(openssl rand -base64 32)"
+export API_KEY="testnet_api_key_$(openssl rand -hex 8)"
+export CORS_ALLOW_ORIGIN="http://localhost:3000"
+export DATABASE_URL="sqlite://./data/testnet_wallet.db?mode=rwc"
+export RUST_LOG=info
+export SERVER_HOST=127.0.0.1
+export SERVER_PORT=8888
+
+# 启动服务器
+cargo run --bin hot_wallet
+```
+
+等待看到以下信息表示启动成功：
+```
+Server listening on 127.0.0.1:8888
+```
+
+然后在新窗口运行测试：
+```bash
+cd Rust-Blockchain-Secure-Wallet
+chmod +x 快速测试Day2修复.sh
+./快速测试Day2修复.sh
+```
+
+如果测试成功，启动1周自动化测试：
+```bash
+chmod +x week_automated_test.sh
+./week_automated_test.sh
+```

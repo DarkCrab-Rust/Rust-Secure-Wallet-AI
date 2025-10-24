@@ -41,6 +41,23 @@ pub struct BridgeResponse {
 }
 
 #[derive(Serialize)]
+pub struct BridgeTransactionResponse {
+    pub id: String,
+    pub from_wallet: String,
+    pub from_chain: String,
+    pub to_chain: String,
+    pub token: String,
+    pub amount: String,
+    pub status: String,
+    pub source_tx_hash: Option<String>,
+    pub destination_tx_hash: Option<String>,
+    pub created_at: String,
+    pub updated_at: String,
+    pub fee_amount: Option<String>,
+    pub estimated_completion_time: Option<String>,
+}
+
+#[derive(Serialize)]
 pub struct BalanceResponse {
     pub balance: String,
     pub network: String,

@@ -1,7 +1,8 @@
 // src/api/handlers.rs
 use crate::api::server::WalletServer;
-use crate::api::types::{BridgeAssetsRequest, BridgeResponse, ErrorResponse};
-use crate::blockchain::bridge::relay::bridge_force_success_enabled;
+use crate::api::types::{BridgeAssetsRequest, BridgeResponse, BridgeTransactionResponse, ErrorResponse};
+
+use crate::blockchain::bridge::BridgeTransactionStatus;
 use crate::core::validation::{validate_amount, validate_token};
 use axum::{extract::State, http::StatusCode, Json};
 use serde_json::{json, Value};
@@ -96,11 +97,6 @@ pub async fn bridge_assets(
         ));
     }
 
-    // If mocks are explicitly enabled via env, short-circuit and return a deterministic id.
-    // This matches repo contract: BRIDGE_MOCK_FORCE_SUCCESS => { "bridge_tx_id": "mock_bridge_tx_hash" }
-    if bridge_force_success_enabled() {
-        return Ok(Json(BridgeResponse { bridge_tx_id: "mock_bridge_tx_hash".to_string() }));
-    }
 
     match server
         .wallet_manager
@@ -149,6 +145,52 @@ pub async fn bridge_assets(
                 }),
             ))
         }
+    }
+}
+
+// centralized in bridge::relay
+
+pub async fn get_bridge_transaction(
+    State(server): State<Arc<WalletServer>>,
+    axum::extract::Path(id): axum::extract::Path<String>,
+) -> Result<Json<BridgeTransactionResponse>, (StatusCode, Json<ErrorResponse>)> {
+    // SECURITY: Rate limiting to prevent DoS attacks
+    if !server.rate_limiter.allow() {
+        return Err((
+            StatusCode::TOO_MANY_REQUESTS,
+            Json(ErrorResponse { error: "Rate limit exceeded".to_string(), code: "RATE_LIMIT_EXCEEDED".to_string() }),
+        ));
+    }
+
+    match server.wallet_manager.get_bridge_transaction_status(&id).await {
+        Ok(tx) => {
+            let status_str = match tx.status {
+                BridgeTransactionStatus::Initiated => "Initiated".to_string(),
+                BridgeTransactionStatus::InTransit => "InTransit".to_string(),
+                BridgeTransactionStatus::Completed => "Completed".to_string(),
+                BridgeTransactionStatus::Failed(msg) => format!("Failed: {}", msg),
+            };
+            let resp = BridgeTransactionResponse {
+                id: tx.id,
+                from_wallet: tx.from_wallet,
+                from_chain: tx.from_chain,
+                to_chain: tx.to_chain,
+                token: tx.token,
+                amount: tx.amount,
+                status: status_str,
+                source_tx_hash: tx.source_tx_hash,
+                destination_tx_hash: tx.destination_tx_hash,
+                created_at: tx.created_at.to_rfc3339(),
+                updated_at: tx.updated_at.to_rfc3339(),
+                fee_amount: tx.fee_amount,
+                estimated_completion_time: tx.estimated_completion_time.map(|t| t.to_rfc3339()),
+            };
+            Ok(Json(resp))
+        }
+        Err(_) => Err((
+            StatusCode::NOT_FOUND,
+            Json(ErrorResponse { error: "Bridge transaction not found".to_string(), code: "NOT_FOUND".to_string() }),
+        )),
     }
 }
 
