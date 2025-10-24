@@ -20,7 +20,7 @@ members = [
 ]
 
 [dependencies]
-secp256k1 = { version = "0.27", features = ["recovery"] }
+secp256k1 = { version = "0.31", features = ["recovery"] }
 # core / runtime
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "time"] }
 tokio-util = "0.7"
