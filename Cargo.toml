@@ -152,7 +152,7 @@ bundled-resources = []
 base64 = "0.22"
 
 tokio = { version = "1", features = ["macros", "rt-multi-thread", "time"] }
-criterion = "0.5"
+criterion = "0.7"
 tempfile = "3.8"
 test-log = "0.2"
 assert_cmd = "2.0"
