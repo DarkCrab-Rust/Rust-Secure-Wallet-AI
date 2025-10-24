@@ -298,6 +298,9 @@ async fn test_get_balance_invalid_network() {
 
 #[tokio::test(flavor = "current_thread")]
 async fn test_wallet_persistence() {
+    // Set test environment for quantum-safe flows to work
+    util::set_test_env();
+    
     let temp_dir = tempdir().unwrap();
     std::env::set_current_dir(temp_dir.path()).unwrap();
     let db_url = "sqlite://wallet_db.sqlite?mode=rwc".to_string();
