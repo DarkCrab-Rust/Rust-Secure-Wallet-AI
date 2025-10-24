@@ -21,6 +21,7 @@
 - [详细功能说明](#-详细功能说明)
 - [安全特性](#-安全特性)
 - [API文档](#-api文档)
+- [脚本使用](#-脚本使用)
 - [测试](#-测试)
 - [部署指南](#-部署指南)
 - [常见问题](#-常见问题)
@@ -943,6 +944,31 @@ Content-Type: application/json
 ```
 
 ---
+
+## 🧰 脚本使用
+
+所有脚本已集中放在 `scripts/` 目录，覆盖启动、测试、诊断、安全检查等常见场景。根据操作系统选择相应脚本：
+
+- Windows（CMD/PowerShell）：运行 `.bat` 脚本，例如：
+  - `.\scripts\start_testnet_windows.bat`（Windows 一键启动测试网）
+  - `.\scripts\test_health.bat`（健康检查）
+  - `.\scripts\test_api_fixed.bat` 或 `.\scripts\test_server_status.bat`（API/服务连通性）
+  - `.\scripts\安全启动服务器.bat`（安全策略下启动）
+- macOS/Linux（Bash/Zsh）：先赋予可执行权限，再运行 `.sh`：
+  - `chmod +x scripts/*.sh`
+  - `./scripts/start_backend.sh` 或 `./scripts/start_backend_fixed.sh`（启动后端）
+  - `./scripts/start_testnet.sh`、`./scripts/restart_testnet.sh`、`./scripts/quick_start_testnet.sh`（启动/重启/快速启动测试网）
+  - `./scripts/test_api_fixed.sh`、`./scripts/test_api_manual.sh`、`./scripts/test_no_auth.sh`（API 测试）
+  - `./scripts/run_all_week1_tests.sh`、`./scripts/run_all_tests_final.sh`（批量测试）
+  - `./scripts/run_security_audit.sh`、`./scripts/run_dependency_audit.sh`（安全/依赖审计）
+  - `./scripts/verify_api_alignment.sh`、`./scripts/final_sync_check.sh`、`./scripts/diagnose_balance.sh`（对齐/同步/诊断）
+
+提示与注意：
+- Windows 首次运行如遇 PowerShell 执行策略限制，可在当前用户范围允许本地脚本：
+  - 以管理员身份打开 PowerShell，执行：`Set-ExecutionPolicy RemoteSigned -Scope CurrentUser`
+- 如使用 Git Bash/WSL，直接按 macOS/Linux 指令运行 `.sh` 脚本。
+- 脚本会读取项目根目录的环境变量（如 `.env` 或系统环境变量），详见 `ENV_VARIABLES.md`。常见变量包括 API Key、网络配置、端口等。
+- 文件名中包含中文或 Emoji 时，请确保终端使用 UTF-8 编码，或通过复制粘贴方式运行命令。
 
 ## 🧪 测试
 
