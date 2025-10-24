@@ -1,0 +1,20 @@
+🔍 查看所有PR（包括已合并/关闭的）
+
+直接复制这个链接到浏览器：
+https://github.com/Yinhang3377/Rust-Blockchain-Secure-Wallet/pulls?q=is%3Apr
+
+或者在GitHub页面的搜索框中，把 "is:pr is:open" 改为 "is:pr"
+
+---
+
+其他有用的链接：
+
+查看已合并的PR：
+https://github.com/Yinhang3377/Rust-Blockchain-Secure-Wallet/pulls?q=is%3Apr+is%3Amerged
+
+查看已关闭的PR：
+https://github.com/Yinhang3377/Rust-Blockchain-Secure-Wallet/pulls?q=is%3Apr+is%3Aclosed
+
+查看所有分支：
+https://github.com/Yinhang3377/Rust-Blockchain-Secure-Wallet/branches
+
