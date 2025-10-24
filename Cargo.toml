@@ -124,7 +124,7 @@ protobuf = "3.5.0"
 sqlx = { version = "0.8.6", default-features = false, features = ["runtime-tokio-rustls", "sqlite", "postgres", "macros", "chrono", "json"] }
 
 # small helpers
-governor = "0.6"
+governor = "0.10"
 ctor = "0.6.0"
 cookie = "0.18"
 
