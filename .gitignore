@@ -64,3 +64,27 @@ dist/
 
 # Build artifacts
 build/
+# macOS
+.AppleDouble
+.LSOverride
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Linux specific
+.fuse_hidden*
+.directory
+.Trash-*
+
+# Rust specific
+**/*.rs.bk
+
+# Scripts output
+scripts/output/
+scripts/logs/
+
+# Temporary cleanup files
+*.bak
+README.md.bak

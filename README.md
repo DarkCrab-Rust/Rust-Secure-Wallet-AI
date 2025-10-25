@@ -2,8 +2,8 @@
 
 [![Rust](https://img.shields.io/badge/rust-1.70%2B-orange.svg)](https://www.rust-lang.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Security: 9.2/10](https://img.shields.io/badge/Security-9.2%2F10-brightgreen.svg)](https://github.com/wang-junxi3344-del/Rust-Secure-Wallet-AI)
-[![Tests: 99.7%](https://img.shields.io/badge/Tests-432%2F433%20passing-success.svg)](https://github.com/wang-junxi3344-del/Rust-Secure-Wallet-AI)
+[![Security: 9.2/10](https://img.shields.io/badge/Security-9.2%2F10-brightgreen.svg)](https://github.com/DarkCrab-Rust/Rust-Blockchain-Secure-Wallet)
+[![Tests: 99.7%](https://img.shields.io/badge/Tests-432%2F433%20passing-success.svg)](https://github.com/DarkCrab-Rust/Rust-Blockchain-Secure-Wallet)
 
 > **企业级区块链安全热钱包解决方案**  
 > Enterprise-grade blockchain security hot wallet solution with AI-enhanced security features
@@ -685,8 +685,8 @@ curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 #### 2. 克隆仓库
 
 ```bash
-git clone https://github.com/wang-junxi3344-del/Rust-Secure-Wallet-AI.git
-cd Rust-Secure-Wallet-AI
+git clone https://github.com/DarkCrab-Rust/Rust-Blockchain-Secure-Wallet.git
+cd Rust-Blockchain-Secure-Wallet
 ```
 
 #### 3. 构建项目
@@ -1328,8 +1328,8 @@ MIT License - 详见 [LICENSE](LICENSE) 文件
 
 ## 📞 联系方式
 
-- **Issues**: [GitHub Issues](https://github.com/wang-junxi3344-del/Rust-Secure-Wallet-AI/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/wang-junxi3344-del/Rust-Secure-Wallet-AI/discussions)
+- **Issues**: [GitHub Issues](https://github.com/DarkCrab-Rust/Rust-Blockchain-Secure-Wallet/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/DarkCrab-Rust/Rust-Blockchain-Secure-Wallet/discussions)
 - **Security**: 安全问题请私下报告
 
 ---
@@ -1371,9 +1371,9 @@ MIT License - 详见 [LICENSE](LICENSE) 文件
 
 ⭐ **如果这个项目对您有帮助，请给一个Star！** ⭐
 
-[⭐ Star](https://github.com/wang-junxi3344-del/Rust-Secure-Wallet-AI) | 
-[🐛 报告Bug](https://github.com/wang-junxi3344-del/Rust-Secure-Wallet-AI/issues) | 
-[💡 功能建议](https://github.com/wang-junxi3344-del/Rust-Secure-Wallet-AI/issues)
+[⭐ Star](https://github.com/DarkCrab-Rust/Rust-Blockchain-Secure-Wallet) | 
+[🐛 报告Bug](https://github.com/DarkCrab-Rust/Rust-Blockchain-Secure-Wallet/issues) | 
+[💡 功能建议](https://github.com/DarkCrab-Rust/Rust-Blockchain-Secure-Wallet/issues)
 
 ---
 
