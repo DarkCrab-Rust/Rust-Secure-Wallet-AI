@@ -8,16 +8,113 @@ cd "$(dirname "$0")"
 
 # 测试配置
 API_BASE="http://localhost:8888"
-TEST_DURATION_DAYS=7
-TEST_INTERVAL_MINUTES=30
+
+# 让用户选择测试模式
+echo "请选择测试模式:"
+echo ""
+echo "1. 快速测试 (5分钟间隔, 测试1小时)"
+echo "2. 短期测试 (10分钟间隔, 测试6小时)"
+echo "3. 中期测试 (30分钟间隔, 测试1天)"
+echo "4. 长期测试 (1小时间隔, 测试3天)"
+echo "5. 完整测试 (2小时间隔, 测试7天)"
+echo "6. 自定义"
+echo ""
+read -p "请输入选项 (1-6): " mode_choice
+
+case $mode_choice in
+    1)
+        TEST_DURATION_MINUTES=60
+        TEST_INTERVAL_MINUTES=5
+        TEST_NAME="快速测试"
+        ;;
+    2)
+        TEST_DURATION_MINUTES=360
+        TEST_INTERVAL_MINUTES=10
+        TEST_NAME="短期测试"
+        ;;
+    3)
+        TEST_DURATION_MINUTES=1440
+        TEST_INTERVAL_MINUTES=30
+        TEST_NAME="中期测试"
+        ;;
+    4)
+        TEST_DURATION_MINUTES=4320
+        TEST_INTERVAL_MINUTES=60
+        TEST_NAME="长期测试"
+        ;;
+    5)
+        TEST_DURATION_MINUTES=10080
+        TEST_INTERVAL_MINUTES=120
+        TEST_NAME="完整测试"
+        ;;
+    6)
+        echo ""
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        echo "自定义测试配置"
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        echo ""
+        
+        # 测试时长
+        echo "请输入测试时长:"
+        read -p "  天数 (0-30): " test_days
+        read -p "  小时 (0-23): " test_hours
+        
+        # 转换为分钟
+        TEST_DURATION_MINUTES=$((test_days * 24 * 60 + test_hours * 60))
+        
+        # 测试间隔
+        echo ""
+        echo "请选择测试间隔:"
+        echo "  1. 每5分钟"
+        echo "  2. 每10分钟"
+        echo "  3. 每30分钟"
+        echo "  4. 每1小时"
+        echo "  5. 每2小时"
+        echo "  6. 自定义间隔(分钟)"
+        read -p "选择 (1-6): " interval_choice
+        
+        case $interval_choice in
+            1) TEST_INTERVAL_MINUTES=5 ;;
+            2) TEST_INTERVAL_MINUTES=10 ;;
+            3) TEST_INTERVAL_MINUTES=30 ;;
+            4) TEST_INTERVAL_MINUTES=60 ;;
+            5) TEST_INTERVAL_MINUTES=120 ;;
+            6) 
+                read -p "请输入间隔(分钟): " TEST_INTERVAL_MINUTES
+                ;;
+            *) 
+                echo "无效选项,使用默认: 10分钟"
+                TEST_INTERVAL_MINUTES=10
+                ;;
+        esac
+        
+        TEST_NAME="自定义测试"
+        echo ""
+        echo "✅ 配置完成:"
+        echo "   测试时长: ${test_days}天${test_hours}小时 (共 $TEST_DURATION_MINUTES 分钟)"
+        echo "   测试间隔: $TEST_INTERVAL_MINUTES 分钟"
+        echo "   预计轮数: $((TEST_DURATION_MINUTES / TEST_INTERVAL_MINUTES)) 轮"
+        echo ""
+        ;;
+    *)
+        echo "无效选项,使用默认: 快速测试"
+        TEST_DURATION_MINUTES=60
+        TEST_INTERVAL_MINUTES=5
+        TEST_NAME="快速测试"
+        ;;
+esac
 
 # 创建测试日志目录
 mkdir -p logs/week_test
 LOG_FILE="logs/week_test/automated_test_$(date +%Y%m%d_%H%M%S).log"
 
-echo "测试配置:"
-echo "  - 测试时长: $TEST_DURATION_DAYS 天"
+echo ""
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "测试配置: $TEST_NAME"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "  - 测试时长: $TEST_DURATION_MINUTES 分钟 ($(echo "scale=2; $TEST_DURATION_MINUTES/60" | bc) 小时)"
 echo "  - 测试间隔: $TEST_INTERVAL_MINUTES 分钟"
+echo "  - 预计测试轮数: $(echo "$TEST_DURATION_MINUTES / $TEST_INTERVAL_MINUTES" | bc)"
 echo "  - API地址: $API_BASE"
 echo "  - 日志文件: $LOG_FILE"
 echo ""
@@ -142,12 +239,54 @@ echo "开始自动化测试循环..."
 echo "按 Ctrl+C 可以停止测试"
 echo ""
 
-# 检查服务器状态
-if ! check_server_status; then
-    echo "❌ 无法连接到服务器，请先启动服务器"
-    echo "建议运行: ./auto_test_final.sh"
-    exit 1
+# 检查并启动服务器
+echo "🔍 检查服务器状态..."
+if ! curl -s "$API_BASE/api/health" > /dev/null 2>&1; then
+    echo "⚠️  服务器未运行"
+    echo ""
+    echo "🚀 自动启动服务器..."
+    
+    # 设置环境变量
+    export WALLET_ENC_KEY="AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
+    export API_KEY="testnet_api_key_51a69b550a2c4149"
+    export CORS_ALLOW_ORIGIN="http://localhost:3000,http://localhost:3010"
+    export DATABASE_URL="sqlite://./data/testnet_wallet.db?mode=rwc"
+    export RUST_LOG="info"
+    export SERVER_HOST="127.0.0.1"
+    export SERVER_PORT="8888"
+    export TEST_SKIP_DECRYPT="1"
+    export ALLOW_BRIDGE_MOCKS="1"
+    
+    # 后台启动服务器
+    mkdir -p logs
+    LOG_FILE_SERVER="logs/server_$(date +%Y%m%d_%H%M%S).log"
+    cargo run --features test-env --bin hot_wallet > "$LOG_FILE_SERVER" 2>&1 &
+    SERVER_PID=$!
+    
+    echo "✅ 服务器已启动 (PID: $SERVER_PID)"
+    echo "📝 服务器日志: $LOG_FILE_SERVER"
+    echo ""
+    
+    # 等待服务器启动
+    echo "⏳ 等待服务器启动 (15秒)..."
+    for i in {15..1}; do
+        echo -n "$i... "
+        sleep 1
+    done
+    echo ""
+    echo ""
+    
+    # 验证服务器
+    if ! curl -s "$API_BASE/api/health" | grep -q "ok\|healthy"; then
+        echo "❌ 服务器启动失败"
+        echo ""
+        echo "查看日志:"
+        tail -20 "$LOG_FILE_SERVER"
+        exit 1
+    fi
 fi
+echo "✅ 服务器运行正常"
+echo ""
 
 while true; do
     ((TEST_COUNT++))
@@ -177,9 +316,11 @@ while true; do
     fi
     
     # 检查是否达到测试时长
-    if [ $TEST_COUNT -ge $((TEST_DURATION_DAYS * 24 * 60 / TEST_INTERVAL_MINUTES)) ]; then
+    TOTAL_TESTS_NEEDED=$((TEST_DURATION_MINUTES / TEST_INTERVAL_MINUTES))
+    if [ $TEST_COUNT -ge $TOTAL_TESTS_NEEDED ]; then
         echo ""
-        echo "🎉 测试完成！已达到 $TEST_DURATION_DAYS 天的测试目标"
+        echo "🎉 测试完成！已完成 $TEST_COUNT 轮测试"
+        echo "   测试时长: $TEST_DURATION_MINUTES 分钟 ($(echo "scale=2; $TEST_DURATION_MINUTES/60" | bc) 小时)"
         break
     fi
     

@@ -106,11 +106,45 @@ impl WalletServer {
             .route("/api/metrics", get(metrics))
             .layer(
                 CorsLayer::new()
-                    .allow_origin(cors_origin.parse::<axum::http::HeaderValue>()
-                        .expect("Invalid CORS_ALLOW_ORIGIN environment variable"))
-                    .allow_methods([axum::http::Method::GET, axum::http::Method::POST, axum::http::Method::DELETE])
-                    .allow_headers([axum::http::header::AUTHORIZATION, axum::http::header::CONTENT_TYPE])
+                    .allow_origin({
+                        use tower_http::cors::AllowOrigin;
+                        let origins_env = cors_origin;
+                        if origins_env.contains(',') {
+                            let list = origins_env
+                                .split(',')
+                                .map(|s| s.trim())
+                                .filter(|s| !s.is_empty())
+                                .map(|s| axum::http::HeaderValue::from_str(s)
+                                    .expect("Invalid CORS origin in list"))
+                                .collect::<Vec<axum::http::HeaderValue>>();
+                            AllowOrigin::list(list)
+                        } else {
+                            AllowOrigin::exact(axum::http::HeaderValue::from_str(&origins_env)
+                                .expect("Invalid CORS_ALLOW_ORIGIN environment variable"))
+                        }
+                    })
+                    .allow_methods([
+                        axum::http::Method::GET, 
+                        axum::http::Method::POST, 
+                        axum::http::Method::DELETE,
+                        axum::http::Method::OPTIONS,
+                        axum::http::Method::PUT,
+                        axum::http::Method::PATCH
+                    ])
+                    .allow_headers([
+                        axum::http::header::AUTHORIZATION, 
+                        axum::http::header::CONTENT_TYPE,
+                        axum::http::header::ACCEPT,
+                        axum::http::header::ORIGIN,
+                        axum::http::header::ACCESS_CONTROL_REQUEST_METHOD,
+                        axum::http::header::ACCESS_CONTROL_REQUEST_HEADERS,
+                    ])
+                    .expose_headers([
+                        axum::http::header::CONTENT_TYPE,
+                        axum::http::header::AUTHORIZATION,
+                    ])
                     .allow_credentials(true)
+                    .max_age(Duration::from_secs(3600))
             )
             .layer(
                 ServiceBuilder::new()
