@@ -1,48 +1,66 @@
-# Rust build artifacts & local cargo target aliases
+# Rust build artifacts
 /target/
-defi-target/
+/defi-target/
+/target_test_*/
 
-# Generated wallet files (do not commit)
-wallet.json
-wallets.db
-.wallets.db
+# Cargo lock for libraries (keep for binaries)
+# Cargo.lock
 
-# Test logs and artifacts
-cargo-test.log
-test.log
-TEMP*.txt
-
-# Environment files (secrets — do not commit)
-.env
-
-# Rust binary and debug symbols
+# Generated files
 *.exe
 *.pdb
 *.rlib
 *.d
+*.so
+*.dylib
+*.dll
 
-# Ignore build artifacts and logs
-build/
-node_modules/
-dist/
-logs/
-.git/
-logs/
-.git/
+# Database files (never commit)
+*.db
+*.sqlite
+*.sqlite3
+wallets.db
+wallet.json
+data/*.db
+data/*.sqlite
 
-# Allow only specific folders
-!src/
-!contracts/
-!scripts/
-!README.md
-# Test artifacts we never commit
-target_test_*
-target/**/target_test_*
+# Test artifacts
+cargo-test.log
+test.log
+TEMP*.txt
+proptest-regressions/
+tarpaulin-report.html
+coverage/
+
+# Environment files (secrets)
+.env
+.env.local
+.env.*.local
+
+# IDE and editor files
 .idea/
 .vscode/
+*.swp
+*.swo
+*~
+.DS_Store
 
-# Allow only specific folders
-!src/
-!contracts/
-!scripts/
-!README.md
+# Logs
+logs/
+*.log
+
+# Backup and temporary files
+*.bak
+*.backup
+*.tmp
+*_backup/
+.git_备份/
+.git_corrupt/
+.husky_bak/
+
+# Node modules (if any)
+node_modules/
+dist/
+
+# Build artifacts
+build/
